@@ -42,6 +42,17 @@
         x-init="initialize()"
     >
         @csrf
+
+        @if ($errors->any())
+            <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <div class="font-semibold">Unable to save service.</div>
+                <ul class="mt-2 list-disc pl-5">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
         <input type="hidden" id="{{ $methodId }}" name="_method" value="POST">
 
         <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6 sm:px-8">
