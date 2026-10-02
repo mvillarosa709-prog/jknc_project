@@ -2189,6 +2189,8 @@
                     $activityContactLabel = trim(collect([$activityContactName, $contact->company_name])->filter()->implode(' - '));
                     $activityContactEmail = $contact->email ?: '';
                     $activityContactPayload = [
+                        'contact_id' => $contact->id,
+                        'company_id' => \App\Support\ActivityRelationships::companyId($contact),
                         'name' => $activityContactName,
                         'label' => $activityContactLabel,
                         'email' => $activityContactEmail,
@@ -2198,6 +2200,8 @@
                 @endphp
 
                 <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                    <button type="button" onclick="openContactActivityShortcut('events')" class="h-10 rounded border">Add Event</button>
+                    <button type="button" onclick="openContactActivityShortcut('messages')" class="h-10 rounded border">Add Message</button>
                     <button type="button" onclick="openContactActivityShortcut('call')" class="h-10 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
                         <i class="fas fa-phone mr-1"></i>Log Call
                     </button>
@@ -2222,7 +2226,7 @@
                         const payload = window.contactActivityPayload || {};
 
                         localStorage.setItem('activity_contact_prefill', JSON.stringify({
-                            type: type,
+                            type: type, contact_id: payload.contact_id, company_id: payload.company_id,
                             contact_name: payload.name || '',
                             related_contact: payload.label || payload.name || '',
                             email: payload.email || '',
@@ -2242,7 +2246,7 @@
                             return;
                         }
 
-                        window.location.href = 'mailto:' + encodeURIComponent(email);
+                        openContactActivityShortcut('email');
                     }
                 </script>
 

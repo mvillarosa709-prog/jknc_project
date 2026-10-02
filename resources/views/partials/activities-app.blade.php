@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!app) return;
 
     const editable = @json($editable);
+    const mainActivitiesUrl = @json(route('activities'));
     let activities = @json($activities ?? []);
     const list = document.getElementById(@json($listId));
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -83,7 +84,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         list.innerHTML = activities.map((activity) => {
             const isLinkedMainActivity = activity.readonly || activity.source === 'main';
-            const sourceBadge = isLinkedMainActivity ? '<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Main Activities</span>' : '';
+            const sourceUrl = new URL(mainActivitiesUrl, window.location.origin);
+            sourceUrl.searchParams.set('activity_type', activity.source_activity_type || '');
+            sourceUrl.searchParams.set('source_id', activity.source_id || '');
+            const sourceBadge = isLinkedMainActivity && activity.source_id && activity.source_activity_type
+                ? `<a href="${escapeHtml(sourceUrl.href)}" class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600" aria-label="${escapeHtml('Open ' + activity.type + ' #' + activity.source_id + ' in Main Activities')}">Main Activities &rarr;</a>`
+                : isLinkedMainActivity ? '<span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Main Activities</span>' : '';
             const actions = editable && !isLinkedMainActivity
                 ? `<button type="button" class="activity-edit text-gray-500 hover:text-blue-600" data-activity-id="${activity.id}"><i class="far fa-pen-to-square"></i></button>${activity.status !== 'Completed' ? `<button type="button" class="activity-complete text-gray-500 hover:text-green-600" data-activity-id="${activity.id}"><i class="fas fa-check"></i></button>` : ''}`
                 : '';

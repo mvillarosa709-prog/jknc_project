@@ -27,6 +27,16 @@ class Company extends Model
         return $this->hasMany(Service::class);
     }
 
+    public function officialBusinessTripTickets(): HasMany
+    {
+        return $this->hasMany(OfficialBusinessTripTicket::class);
+    }
+
+    public function travelCreditAccount(): HasOne
+    {
+        return $this->hasOne(CompanyTravelCreditAccount::class);
+    }
+
     public function cifs(): HasMany
     {
         return $this->hasMany(CompanyCif::class);

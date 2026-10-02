@@ -80,6 +80,12 @@
                             </button>
 
                             <div id="companyHeaderMenu" class="hidden absolute right-0 top-11 z-30 min-w-[220px] rounded-md border border-gray-200 bg-white py-1 shadow-sm">
+                                @if ($authUser && app(\App\Services\OfficialBusinessAuthorizationService::class)->canReadFinance($authUser))
+                                    <a href="{{ route('activities.official-business.travel-credits.show', $company->id) }}" class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                        Travel Credits
+                                    </a>
+                                @endif
+
                                 <a href="{{ route('company.history', $company->id) }}" class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">
                                     View Audit History
                                 </a>

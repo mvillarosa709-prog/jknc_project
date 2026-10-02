@@ -345,6 +345,16 @@
                         </a>
                     @endif
 
+                    @if($user->isClient())
+                        <a href="{{ route('client.official-business.trip-tickets.page') }}"
+                           title="Trip Tickets"
+                           :class="expanded ? 'justify-start px-3' : 'justify-center px-0'"
+                           class="flex items-center gap-3 py-2.5 rounded-xl transition border {{ request()->routeIs('client.official-business.trip-tickets.page') ? 'bg-blue-50 text-blue-700 border-blue-100 font-semibold' : 'border-transparent text-gray-700 hover:bg-gray-50 hover:text-gray-900' }}">
+                            <span class="h-8 w-8 shrink-0 rounded-lg bg-gray-100 flex items-center justify-center"><i class="fas fa-route text-xs"></i></span>
+                            <span x-show="expanded" x-transition.opacity.duration.200ms class="flex-1 whitespace-nowrap">Trip Tickets</span>
+                        </a>
+                    @endif
+
                     @if($canSeeHumanCapital)
                         <a href="{{ $humanCapitalLandingRoute }}"
                            title="Human Capital"
@@ -446,9 +456,7 @@
                             </button>
                             <div x-cloak x-show="isOpen('operations')" x-collapse.duration.200ms class="ml-11 space-y-1 border-l border-gray-100 pl-3">
                                 @if(Auth::user()->hasPermission('access_activities'))
-                                    @if(\Illuminate\Support\Facades\Route::has('activities.index'))
-                                        <a href="{{ route('activities.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('activities*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}">Activities</a>
-                                    @elseif(\Illuminate\Support\Facades\Route::has('activities'))
+                                    @if(\Illuminate\Support\Facades\Route::has('activities'))
                                         <a href="{{ route('activities') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('activities*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}">Activities</a>
                                     @endif
                                 @endif
@@ -462,6 +470,35 @@
                                 @if(Auth::user()->hasPermission('access_transmittal'))
                                     <a href="{{ route('transmittal.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('transmittal*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}">Transmittal</a>
                                 @endif
+
+                                <div x-data="{ open: {{ request()->routeIs('visitor-log*') ? 'true' : 'false' }} }" class="space-y-1">
+                                    <button type="button" @click="open = !open"
+                                        class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition
+                                        {{ request()->routeIs('visitor-log*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                                        <span>Visitor Log</span>
+                                        <i class="fas fa-chevron-down text-[11px]" :class="open ? 'rotate-180' : ''"></i>
+                                    </button>
+
+                                    <div x-cloak x-show="open" x-transition class="pl-3 space-y-1">
+
+                                        <div x-data="{ open: {{ request()->routeIs('front-desk*') ? 'true' : 'false' }} }">
+                                            <button type="button" @click="open = !open"
+                                                class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition
+                                                {{ request()->routeIs('front-desk*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                                                <span>Front Desk</span>
+                                                <i class="fas fa-chevron-down text-[11px]" :class="open ? 'rotate-180' : ''"></i>
+                                            </button>
+
+                                            <div x-cloak x-show="open" x-transition class="pl-3">
+                                                <a href="#"
+                                                   class="block px-3 py-2 rounded-lg transition text-gray-600 hover:bg-gray-50">
+                                                    Visit Records
+                                                </a>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     @endif

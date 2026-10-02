@@ -39,5 +39,19 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('townhall:archive-expired')->everyMinute();
         $schedule->command('reports:generate-scheduled')->everyMinute();
         $schedule->command('natgov:sync-reminders')->everyMinute();
+        $schedule->command('activities:dispatch-reminders')->everyMinute();
+        $schedule->command('activities:generate-recurring')->hourly();
+        $schedule->call(function (): void {
+            if (! \App\Services\Gmail\GmailTransport::enabled()) {
+                return;
+            }
+
+            \App\Models\EmailMailboxConnection::query()
+                ->where('provider', 'gmail')
+                ->where('connection_status', 'connected')
+                ->whereNotNull('encrypted_refresh_token')
+                ->pluck('id')
+                ->each(fn (int $id) => \App\Jobs\SyncGmailMailboxes::dispatch($id));
+        })->name('gmail:sync-mailboxes')->withoutOverlapping(1)->everyTwoMinutes();
     })
     ->create();
