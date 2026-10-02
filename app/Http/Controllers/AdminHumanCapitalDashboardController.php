@@ -201,6 +201,14 @@ class AdminHumanCapitalDashboardController extends Controller
     {
         $this->authorizeHumanCapitalAdmin();
 
+        if ((int) $officialBusinessTrip->workflow_version >= 3) {
+            abort_unless(
+                $officialBusinessTrip->status === 'Submitted',
+                422,
+                'Only submitted V3 Official Business requests can be approved.'
+            );
+        }
+
         $officialBusinessTrip->update([
             'status' => 'Approved',
         ]);
@@ -221,6 +229,14 @@ class AdminHumanCapitalDashboardController extends Controller
     public function rejectObf(Request $request, OfficialBusinessTrip $officialBusinessTrip)
     {
         $this->authorizeHumanCapitalAdmin();
+
+        if ((int) $officialBusinessTrip->workflow_version >= 3) {
+            abort_unless(
+                $officialBusinessTrip->status === 'Submitted',
+                422,
+                'Only submitted V3 Official Business requests can be rejected.'
+            );
+        }
 
         $request->validate([
             'remarks' => 'nullable|string|max:1000',

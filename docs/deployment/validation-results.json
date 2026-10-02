@@ -1,0 +1,163 @@
+{
+    "checked_at":  "2026-10-02T02:44:30.806Z",
+    "manifest_paths_and_hashes":  "PASS",
+    "migration_inventory":  "PASS",
+    "env_keys_and_secret_default_redaction":  "PASS",
+    "sql_readonly_static":  "PASS",
+    "sql_select_statements":  21,
+    "secret_pattern_scan":  "PASS (kit and 16 remediation source files; not proof that pre-existing repository/history is secret-free)",
+    "utf8_without_bom":  "PASS (kit and 16 remediation source files)",
+    "git_whitespace_check":  "PASS for remediation source and kit, including untracked files via --no-index --check",
+    "backups_copied":  "NO",
+    "php_syntax_files":  295,
+    "php_syntax":  "PASS (php -l only; no migration execution)",
+    "frontend":  [
+                     {
+                         "path":  "tests/Frontend/all-activities-calendar-regression.cjs",
+                         "result":  "PASS",
+                         "output":  "PASS: All Activities has no submenu/calendar state, parent/back/default open the landing area, and Tasks retains List/Board/Calendar and the original Google Calendar embed."
+                     },
+                     {
+                         "path":  "tests/Frontend/tasks-messages-navigation-regression.cjs",
+                         "result":  "PASS",
+                         "output":  "PASS: main-only tasks across 162 search/filter combinations, counts, existing/new/nested subtasks, new main tasks, and Facebook Messenger sidebar routing."
+                     },
+                     {
+                         "path":  "tests/Frontend/messenger-outbound-regression.cjs",
+                         "result":  "PASS",
+                         "output":  "PASS: text retry, single-image external send, unsupported local mode, multiple local mode, attachment-aware UUID, and double-submit guard."
+                     },
+                     {
+                         "path":  "tests/Frontend/ob-draft-edit-regression.cjs",
+                         "result":  "PASS",
+                         "output":  "O.B. Draft edit regression: 11 assertions passed; full Blade script parsed."
+                     },
+                     {
+                         "path":  "tests/Frontend/ob-all-activities-master-detail-regression.cjs",
+                         "result":  "PASS",
+                         "output":  "All Activities O.B. master detail regression passed"
+                     }
+                 ],
+    "feature_tests":  {
+                          "status":  "PASS",
+                          "isolation":  "SQLite :memory:; synthetic local APP_KEY; no MySQL or real providers",
+                          "tests":  280,
+                          "assertions":  3453,
+                          "source_manifest_sha256":  "09dacb28c9d7439d60ff0386897e0962d9950475b5f1143be4cc76848ba7a785",
+                          "suites":  [
+                                         {
+                                             "suite":  "Tests\\Feature\\ActivitiesV2RemainingBackendTest",
+                                             "tests":  54,
+                                             "assertions":  1386,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\ActivitiesBackendCompatibilityTest",
+                                             "tests":  22,
+                                             "assertions":  408,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\ActivitiesOfficialBusinessTest",
+                                             "tests":  12,
+                                             "assertions":  129,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\ActivitiesVisitorLogTest",
+                                             "tests":  7,
+                                             "assertions":  80,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\OfficialBusinessV3FoundationTest",
+                                             "tests":  22,
+                                             "assertions":  89,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\OfficialBusinessV3WorkflowTest",
+                                             "tests":  46,
+                                             "assertions":  426,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\OfficialBusinessV3TicketDataTest",
+                                             "tests":  21,
+                                             "assertions":  267,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\OfficialBusinessV3TicketCompletionTest",
+                                             "tests":  27,
+                                             "assertions":  199,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\OfficialBusinessMasterPersonnelBackfillCommandTest",
+                                             "tests":  7,
+                                             "assertions":  45,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\MessengerFoundationTest",
+                                             "tests":  21,
+                                             "assertions":  158,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\MessengerOutboundTest",
+                                             "tests":  29,
+                                             "assertions":  175,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\MessengerReadinessTest",
+                                             "tests":  3,
+                                             "assertions":  36,
+                                             "errors":  0,
+                                             "failures":  0
+                                         },
+                                         {
+                                             "suite":  "Tests\\Feature\\MeetingCalendarPopupTest",
+                                             "tests":  9,
+                                             "assertions":  55,
+                                             "errors":  0,
+                                             "failures":  0
+                                         }
+                                     ],
+                          "final_diff_note":  "After suites passed, only unrelated owner encoding/comment text was preserved and whitespace was normalized; no tested behavior changed."
+                      },
+    "additional_validation":  {
+                                  "blade_compilation":  "PASS: php artisan view:cache in disposable clone",
+                                  "browser_composer_harness":  {
+                                                                   "path":  "tests/Frontend/message-composer-regression.cjs",
+                                                                   "status":  "PASS",
+                                                                   "browser":  "headless Microsoft Edge",
+                                                                   "api":  "mocked local fixture"
+                                                               },
+                                  "whole_tree_git_diff_check":  "PASS for integration changes",
+                                  "working_mysql_modified":  "NO",
+                                  "production_mysql_modified":  "NO",
+                                  "migrations_executed_on_mysql":  "NO",
+                                  "database_exports_added":  "NO",
+                                  "storage_backups_added":  "NO",
+                                  "runtime_files_committed":  "NO"
+                              },
+    "mysql_schema_execution":  "NOT RUN: no MySQL database connected",
+    "build":  "NOT RUN: no asset inputs changed; Blade/frontend regressions checked",
+    "live_providers":  "NOT CONNECTED",
+    "git_writes":  "Owner integration branch prepared; starting owner history preserved",
+    "verdict":  "GITHUB INTEGRATION VALIDATED; PRODUCTION NOT ASSESSED"
+}

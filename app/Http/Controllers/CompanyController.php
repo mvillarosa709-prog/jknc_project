@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
-use App\Models\CompanyActivity;
 use App\Models\CompanyBif;
 use App\Models\CompanyConsultationNote;
 use App\Models\CompanyHistoryEntry;
@@ -14,6 +13,8 @@ use App\Models\Product;
 use App\Models\Project;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\ActivitiesReportService;
+use App\Services\ActivityAuditService;
 use App\Support\ActivityTimelineBuilder;
 use App\Support\CompanyHistoryLogger;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -727,12 +728,150 @@ class CompanyController extends Controller
     public function activities(Request $request, int $company): View
     {
         $companyData = $this->findCompanyOrAbort($request, $company);
+        $user = $request->user();
+
+        abort_unless($user instanceof User, 401);
 
         return view('company.activities', [
             'company' => (object) $companyData,
-            'activities' => $this->companyActivities($companyData),
+            'activities' => $this->companyActivities($companyData, $user),
             'activitiesIndexUrl' => route('activities'),
         ]);
+    }
+
+    public function report(Request $request, int $company): View
+    {
+        $companyData = $this->findCompanyOrAbort($request, $company);
+
+        return view('company.report', [
+            'company' => (object) $companyData,
+            'reportDatasetUrl' => url('/api/activities/report'),
+        ]);
+    }
+
+    public function reportPdf(
+        Request $request,
+        int $company,
+        ActivitiesReportService $reports,
+        ActivityAuditService $audit
+    ) {
+        $companyData = $this->findCompanyOrAbort($request, $company);
+        $user = $request->user();
+
+        abort_unless($user instanceof User, 401);
+
+        $validated = $request->validate([
+            'selected_ids' => ['nullable', 'array'],
+            'selected_ids.*' => ['string'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'activity_types' => ['nullable', 'array'],
+            'activity_types.*' => ['string'],
+            'status' => ['nullable', 'string', 'max:80'],
+        ]);
+
+        $companyParameters = [
+            'company_id' => $company,
+            'date_from' => $validated['date_from'] ?? null,
+            'date_to' => $validated['date_to'] ?? null,
+            'activity_types' => $validated['activity_types'] ?? [],
+            'status' => $validated['status'] ?? null,
+        ];
+
+        $selectionWasSubmitted = array_key_exists('selected_ids', $validated);
+
+        $selectedIds = collect($validated['selected_ids'] ?? [])
+            ->map(fn ($id) => strtolower(trim((string) $id)))
+            ->unique()
+            ->values();
+
+        if ($selectionWasSubmitted) {
+            // Build the authorized company boundary once, then derive the
+            // selected export from that immutable snapshot. This prevents
+            // selected-row export from ever escaping the current company.
+            $companyScopeDataset = $reports->build($user, [
+                'company_id' => $company,
+            ]);
+
+            $selectedRows = collect($companyScopeDataset['rows'])
+                ->filter(fn (array $row): bool => $selectedIds->contains(
+                    strtolower((string) $row['id'])
+                ))
+                ->values();
+
+            $withDuration = $selectedRows
+                ->filter(fn (array $row): bool => $row['duration_minutes'] !== null);
+
+            $totalActivities = $selectedRows->count();
+            $totalDurationMinutes = (int) $withDuration->sum('duration_minutes');
+
+            $selectedDates = $selectedRows
+                ->pluck('occurred_at')
+                ->filter()
+                ->map(fn ($value) => \Carbon\Carbon::parse($value));
+
+            $dataset = $companyScopeDataset;
+            $dataset['selection_mode'] = 'selected';
+            $dataset['filters'] = [];
+            $dataset['rows'] = $selectedRows->all();
+            $dataset['report_period'] = [
+                'from' => $selectedDates->isEmpty()
+                    ? null
+                    : $selectedDates->min()->copy()->startOfDay()->toIso8601String(),
+                'to' => $selectedDates->isEmpty()
+                    ? null
+                    : $selectedDates->max()->copy()->endOfDay()->toIso8601String(),
+            ];
+            $dataset['duration_coverage'] = [
+                'activities_with_duration' => $withDuration->count(),
+                'total_activities' => $totalActivities,
+                'coverage_percentage' => $totalActivities === 0
+                    ? 0.0
+                    : round(($withDuration->count() / $totalActivities) * 100, 2),
+                'total_duration_minutes' => $totalDurationMinutes,
+                'total_duration_hours' => round($totalDurationMinutes / 60, 2),
+                'by_activity_type' => $withDuration
+                    ->groupBy('source_activity_type')
+                    ->map(fn ($rows, $type): array => [
+                        'activity_type' => $type,
+                        'activities_with_duration' => $rows->count(),
+                        'duration_minutes' => (int) $rows->sum('duration_minutes'),
+                        'duration_hours' => round(((int) $rows->sum('duration_minutes')) / 60, 2),
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        } else {
+            $dataset = $reports->build($user, $companyParameters);
+        }
+
+        $audit->record('REPORT', null, 'export_generated', [], [
+            'selection_mode' => $dataset['selection_mode'],
+            'row_count' => count($dataset['rows']),
+            'parameters' => [
+                'company_id' => $company,
+                'selected_ids' => $validated['selected_ids'] ?? [],
+                'date_from' => $validated['date_from'] ?? null,
+                'date_to' => $validated['date_to'] ?? null,
+                'activity_types' => $validated['activity_types'] ?? [],
+                'status' => $validated['status'] ?? null,
+                'format' => 'pdf',
+                'company_report' => true,
+            ],
+        ]);
+
+        $filename = 'client-activity-report-'
+            .Str::slug((string) ($companyData['company_name'] ?? 'company'))
+            .'-'
+            .now()->format('Ymd-His')
+            .'.pdf';
+
+        return \Barryvdh\DomPDF\Facade\Pdf::loadView('company.report-pdf', [
+            'company' => (object) $companyData,
+            'dataset' => $dataset,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->download($filename);
     }
 
     public function projects(Request $request, int $company): View
@@ -1017,84 +1156,9 @@ class CompanyController extends Controller
         ];
     }
 
-    private function companyActivities(array $companyData): array
+    private function companyActivities(array $companyData, User $user): array
     {
-        $companyId = (int) $companyData['id'];
-        $mainActivities = app(ActivityTimelineBuilder::class)->forCompany($companyData);
-
-        if (Schema::hasTable('company_activities')) {
-            $companyActivities = CompanyActivity::query()
-                ->where('company_id', $companyId)
-                ->latest('due_at')
-                ->get()
-                ->map(fn (CompanyActivity $activity) => [
-                    'id' => $activity->id,
-                    'source' => 'company',
-                    'readonly' => false,
-                    'type' => $activity->type,
-                    'icon' => match (strtolower($activity->type)) {
-                        'call' => 'fa-phone',
-                        'meeting' => 'fa-video',
-                        'email' => 'fa-envelope',
-                        default => 'fa-square-check',
-                    },
-                    'description' => $activity->description,
-                    'when' => optional($activity->due_at)->format('M d, Y h:i A') ?: '-',
-                    'owner' => $activity->assigned_user,
-                    'status' => $activity->status,
-                    'notes' => $activity->notes,
-                    'dueAt' => optional($activity->due_at)->format('Y-m-d\TH:i'),
-                ])
-                ->all();
-
-            return collect($mainActivities)
-                ->merge($companyActivities)
-                ->sortByDesc(fn (array $activity): string => $activity['dueAt'] ?? $activity['when'] ?? '')
-                ->values()
-                ->all();
-        }
-
-        if ($mainActivities !== []) {
-            return $mainActivities;
-        }
-
-        $owner = $companyData['owner_name'] ?? 'John Admin';
-
-        return [
-            [
-                'id' => 1,
-                'type' => 'Call',
-                'icon' => 'fa-phone',
-                'description' => 'Follow-up call regarding implementation timeline',
-                'when' => 'Mar 03, 2026 02:30 PM',
-                'owner' => $owner,
-                'status' => 'Completed',
-                'notes' => 'Discussed deployment dependencies.',
-                'dueAt' => '2026-03-03T14:30',
-            ],
-            [
-                'id' => 2,
-                'type' => 'Meeting',
-                'icon' => 'fa-video',
-                'description' => 'Quarterly review meeting with stakeholders',
-                'when' => 'Mar 01, 2026 10:00 AM',
-                'owner' => 'Maria Santos',
-                'status' => 'Completed',
-                'notes' => 'Budget and rollout approved.',
-                'dueAt' => '2026-03-01T10:00',
-            ],
-            [
-                'id' => 3,
-                'type' => 'Task',
-                'icon' => 'fa-square-check',
-                'description' => 'Prepare contract documents for review',
-                'when' => 'Feb 27, 2026 11:00 AM',
-                'owner' => $owner,
-                'status' => 'Pending',
-                'notes' => 'Waiting on legal feedback.',
-                'dueAt' => '2026-02-27T11:00',
-            ],
-        ];
+        return app(ActivityTimelineBuilder::class)->forCompany($companyData, $user);
     }
 
     private function findCompanyOrAbort(Request $request, int $company): array
@@ -2038,7 +2102,6 @@ class CompanyController extends Controller
                 'company_cifs',
                 'company_history_entries',
                 'company_consultation_notes',
-                'company_activities',
                 'deals',
                 'products',
                 'services',

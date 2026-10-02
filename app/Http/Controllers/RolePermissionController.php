@@ -49,6 +49,12 @@ class RolePermissionController extends Controller
         'access_hc_my_hc',
         'access_hc_attendance',
         'access_hc_obf',
+        'create_hc_obf',
+        'approve_hc_obf',
+        'control_hc_obf_travel',
+        'manage_hc_obf',
+        'access_hc_obf_finance',
+        'admin_hc_obf',
         'access_hc_employee_requests',
         'access_hc_employee_relations',
         'access_hc_memos',
@@ -173,6 +179,7 @@ class RolePermissionController extends Controller
 
                 'access_human_capital' => false,
                 ...array_fill_keys($this->humanCapitalPermissionColumns, false),
+                'create_hc_obf' => true,
 
                 ...array_fill_keys($this->financePermissionColumns, false),
             ]

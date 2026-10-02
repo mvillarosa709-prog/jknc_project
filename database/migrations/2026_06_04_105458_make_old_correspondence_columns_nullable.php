@@ -17,6 +17,10 @@ return new class extends Migration
             return;
         }
 
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         if ($this->columnExists('uploaded_date')) {
             DB::statement("ALTER TABLE correspondences MODIFY uploaded_date DATE NULL");
         }

@@ -210,6 +210,13 @@
 @include('products.partials.create-field-dropdown', [
     'fieldTypes' => $fieldTypes,
     'dropdownId' => 'createFieldDropdownMenu',
+    'extraOptions' => [
+        [
+            'value' => 'report',
+            'label' => 'REPORT',
+            'icon' => 'fa-file-lines',
+        ],
+    ],
 ])
 @include('products.partials.create-field-modal', [
     'createFieldActionRoute' => route('company.custom-fields.store'),
@@ -224,6 +231,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const openCreateFieldDropdown = document.getElementById('openCreateFieldDropdown');
     const createFieldDropdownMenu = document.getElementById('createFieldDropdownMenu');
     const fieldTypeButtons = Array.from(document.querySelectorAll('.create-field-type-option'));
+    const companyReportOption = document.querySelector('[data-special-action="report"]');
     const createFieldModal = document.getElementById('createFieldModal');
     const createFieldPanel = document.getElementById('createFieldPanel');
     const createFieldModalOverlay = document.getElementById('createFieldModalOverlay');
@@ -444,6 +452,25 @@ document.addEventListener('DOMContentLoaded', function () {
             const label = button.dataset.fieldLabel || 'Picklist';
             openCreateFieldModalFn(type, label);
         });
+    });
+
+    companyReportOption?.addEventListener('click', function () {
+        const selectedCompanies = Array.from(
+            document.querySelectorAll('.row-checkbox:checked')
+        ).map((checkbox) => checkbox.value);
+
+        if (selectedCompanies.length !== 1) {
+            alert('Please select exactly one company to generate a report.');
+            return;
+        }
+
+        closeCreateFieldDropdownFn();
+
+        window.location.href =
+            @json(url('/company')) +
+            '/' +
+            encodeURIComponent(selectedCompanies[0]) +
+            '/report';
     });
 
     closeCreateFieldModal?.addEventListener('click', closeCreateFieldModalFn);

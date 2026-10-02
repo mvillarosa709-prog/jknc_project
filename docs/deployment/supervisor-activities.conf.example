@@ -1,0 +1,58 @@
+; EXAMPLE ONLY. Adapt user, PHP path, working directory, queues, connection and logs.
+; No secrets belong in this file. Shared logs directory must exist and be writable.
+; Use only after reviewing DB_QUEUE_RETRY_AFTER >= 180 (or Redis equivalent).
+[program:jknc-messenger]
+command=/usr/bin/php /srv/jknc/current/artisan queue:work database --queue=messaging,messenger-outbound --sleep=3 --tries=5 --timeout=60 --max-time=3600
+directory=/srv/jknc/current
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stopwaitsecs=300
+redirect_stderr=true
+stdout_logfile=/srv/jknc/shared/logs/worker-messenger.log
+stdout_logfile_maxbytes=20MB
+stdout_logfile_backups=5
+
+[program:jknc-gmail-sync]
+command=/usr/bin/php /srv/jknc/current/artisan queue:work database --queue=gmail-sync --sleep=3 --tries=3 --timeout=130 --max-time=3600
+directory=/srv/jknc/current
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stopwaitsecs=300
+redirect_stderr=true
+stdout_logfile=/srv/jknc/shared/logs/worker-gmail-sync.log
+stdout_logfile_maxbytes=20MB
+stdout_logfile_backups=5
+
+[program:jknc-gmail-send]
+command=/usr/bin/php /srv/jknc/current/artisan queue:work database --queue=gmail-send --sleep=3 --tries=1 --timeout=100 --max-time=3600
+directory=/srv/jknc/current
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stopwaitsecs=300
+redirect_stderr=true
+stdout_logfile=/srv/jknc/shared/logs/worker-gmail-send.log
+stdout_logfile_maxbytes=20MB
+stdout_logfile_backups=5
+
+[program:jknc-default]
+command=/usr/bin/php /srv/jknc/current/artisan queue:work database --queue=default --sleep=3 --tries=3 --timeout=60 --max-time=3600
+directory=/srv/jknc/current
+user=www-data
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stopwaitsecs=300
+redirect_stderr=true
+stdout_logfile=/srv/jknc/shared/logs/worker-default.log
+stdout_logfile_maxbytes=20MB
+stdout_logfile_backups=5

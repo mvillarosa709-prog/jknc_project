@@ -35,6 +35,12 @@
             </div>
         @endif
 
+        @if (session('error'))
+            <div class="mx-5 mt-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-semibold">
+                {{ session('error') }}
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="mx-5 mt-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                 <p class="font-bold mb-1">Please fix the following:</p>
@@ -89,14 +95,59 @@
                                 </td>
                                 <td class="p-3 text-right whitespace-nowrap">
                                     <button type="button" @click="openView(trip)" class="text-indigo-600 hover:underline text-xs font-semibold mr-3">View</button>
-                                    <button type="button" @click="openEdit(trip)" class="text-blue-600 hover:underline text-xs font-semibold mr-3">Edit</button>
+                                    <a
+                                        :href="`{{ url('/api/official-business') }}/${trip.id}/history.pdf`"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="text-slate-600 hover:underline text-xs font-semibold mr-3"
+                                    >
+                                        Master History PDF
+                                    </a>
+                                    <a
+                                        x-show="Number(trip.workflow_version || 1) >= 3 && trip.is_client_travel && (trip.trip_tickets || []).length"
+                                        :href="`{{ route('activities') }}?activity_type=official_business_travel&source_id=${trip.id}&section=completion`"
+                                        class="text-blue-600 hover:underline text-xs font-semibold mr-3"
+                                        x-text="`Trip Tickets (${trip.trip_tickets?.length || 0})`"
+                                    ></a>
+                                    <button
+                                        type="button"
+                                        @click="openEdit(trip)"
+                                        x-show="trip.can_edit"
+                                        class="text-blue-600 hover:underline text-xs font-semibold mr-3"
+                                    >
+                                        Edit
+                                    </button>
 
-                                    <form :action="`{{ url('/human-capital/obf') }}/${trip.id}/approve`" method="POST" class="inline" x-show="canManageObf && trip.status === 'Pending'">
+                                    <form
+                                        :action="`{{ url('/human-capital/obf') }}/${trip.id}/approve`"
+                                        method="POST"
+                                        class="inline"
+                                        x-show="
+                                            canApproveObf
+                                            && (
+                                                Number(trip.workflow_version || 1) >= 3
+                                                    ? trip.status === 'Submitted'
+                                                    : trip.status === 'Pending'
+                                            )
+                                        "
+                                    >
                                         @csrf
                                         <button type="submit" class="text-green-600 hover:underline text-xs font-semibold mr-3">Approve</button>
                                     </form>
 
-                                    <form :action="`{{ url('/human-capital/obf') }}/${trip.id}/reject`" method="POST" class="inline" x-show="canManageObf && trip.status === 'Pending'">
+                                    <form
+                                        :action="`{{ url('/human-capital/obf') }}/${trip.id}/reject`"
+                                        method="POST"
+                                        class="inline"
+                                        x-show="
+                                            canApproveObf
+                                            && (
+                                                Number(trip.workflow_version || 1) >= 3
+                                                    ? trip.status === 'Submitted'
+                                                    : trip.status === 'Pending'
+                                            )
+                                        "
+                                    >
                                         @csrf
                                         <button type="submit" class="text-orange-600 hover:underline text-xs font-semibold mr-3">Reject</button>
                                     </form>
@@ -109,7 +160,11 @@
                                     >
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="text-red-500 hover:underline text-xs font-semibold">Delete</button>
+                                        <button
+                                            type="submit"
+                                            x-show="trip.can_delete"
+                                            class="text-red-500 hover:underline text-xs font-semibold"
+                                        >Delete</button>
                                     </form>
                                 </td>
                             </tr>
@@ -170,143 +225,875 @@
                         </div>
 
                         <div class="obf-reference">
-                            <div><b>OB Reference No.:</b><strong x-text="form.ob_reference_no || 'Auto-generated'"></strong></div>
+                            <div><b>OB Reference No.:</b><strong x-text="form.ob_reference_no || '-'"></strong></div>
                             <div><b>Date & Time:</b><strong>{{ now()->format('n/j/Y h:i:s A') }}</strong></div>
-                            <div class="obf-config">Config loaded</div>
                         </div>
 
-                        <div class="section-title">A. Travel Information</div>
-                        <table class="preview-table">
+                                                                        <div class="section-title">
+                            Client & Billability Section
+                        </div>
+
+                        <table class="preview-table text-xs">
+
+                            {{-- NO: INTERNAL / NON-CLIENT --}}
+                            <template x-if="form.is_client_travel == '0'">
+                                <tbody>
+
+                                    <tr>
+                                        <td style="width:28%;">
+                                            <b>Is this travel for a client?</b>
+                                            <span class="ml-1">No</span>
+                                        </td>
+
+                                        <td style="width:72%;">
+                                            <b>Travel Purpose Options:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="
+                                                    Array.isArray(form.purpose_options)
+                                                        && form.purpose_options.length
+                                                        ? form.purpose_options
+                                                            .filter(
+                                                                option =>
+                                                                    option !== 'Client Meeting'
+                                                            )
+                                                            .join(', ')
+                                                        : '-'
+                                                "
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td colspan="2">
+                                            <b>Purpose / Details:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.purpose || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr x-show="form.purpose_other">
+                                        <td colspan="2">
+                                            <b>If Others, specify:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.purpose_other || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td style="width:50%;">
+                                            <b>Departure Date:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.date_from || '-'"
+                                            ></span>
+                                        </td>
+
+                                        <td style="width:50%;">
+                                            <b>Return Date:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.date_to || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td style="width:50%;">
+                                            <b>Departure Time:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.departure_time || '-'"
+                                            ></span>
+                                        </td>
+
+                                        <td style="width:50%;">
+                                            <b>Return Time:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.return_time || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                </tbody>
+                            </template>
+
+                            {{-- YES: CLIENT O.B. --}}
+                            <template x-if="form.is_client_travel == '1'">
+                                <tbody>
+
+                                    <tr>
+                                        <td style="width:50%;">
+                                            <b>Is this travel for a client?</b>
+                                            <span class="ml-1">Yes</span>
+                                        </td>
+
+                                        <td style="width:50%;">
+                                            <b>Client Coverage:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.client_mode === 'multiple' ? 'Multiple Clients' : 'Single Client'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td colspan="2">
+                                            <b x-text="form.client_mode === 'multiple' ? 'Primary Client:' : 'Selected Client Contact:'"></b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="
+                                                    contacts.find(
+                                                        contact => String(contact.id) === String(form.client_contact_id)
+                                                    )?.label || '-'
+                                                "
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td style="width:50%;">
+                                            <b>Client Type:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.client_type || '-'"
+                                            ></span>
+                                        </td>
+
+                                        <td style="width:50%;">
+                                            <b>Client ID / CIF No.:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.client_id_no || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td style="width:50%;">
+                                            <b>Client Name:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.client_name || '-'"
+                                            ></span>
+                                        </td>
+
+                                        <td style="width:50%;">
+                                            <b>Client Email:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.client_email || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td style="width:50%;">
+                                            <b>Client Contact Number:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="selectedClientPhone || '-'"
+                                            ></span>
+                                        </td>
+
+                                        <td style="width:50%;">
+                                            <b>Company / Business Name:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="selectedClientCompany || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+                                    <tr>
+                                        <td style="width:50%;">
+                                            <b>Contract Number:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.client_contract_number || '-'"
+                                            ></span>
+                                        </td>
+
+                                        <td style="width:50%;">
+                                            <b>Contract Type:</b>
+                                            <span
+                                                class="ml-1"
+                                                x-text="form.contract_type || '-'"
+                                            ></span>
+                                        </td>
+                                    </tr>
+
+
+                                    <!-- SINGLE CLIENT: NO ADDITIONAL CLIENTS -->
+                                    <template x-if="form.client_mode !== 'multiple'">
+                                        <tr>
+                                            <td colspan="2">
+                                                <b>Travel Billability:</b>
+                                                <span
+                                                    class="ml-1"
+                                                    x-text="form.travel_billability || '-'"
+                                                ></span>
+                                            </td>
+                                        </tr>
+                                    </template>
+
+                                    <!-- MULTIPLE CLIENTS: SHOW ADDITIONAL CLIENTS -->
+                                    <template x-if="form.client_mode === 'multiple'">
+                                        <tr>
+                                            <td style="width:50%;">
+                                                <b>Travel Billability:</b>
+                                                <span
+                                                    class="ml-1"
+                                                    x-text="form.travel_billability || '-'"
+                                                ></span>
+                                            </td>
+
+
+                                        </tr>
+                                    </template>
+
+                                    <template
+                                        x-if="
+                                            form.client_mode === 'multiple'
+                                            && Array.isArray(form.company_ids)
+                                            && form.company_ids.filter(Boolean).length
+                                        "
+                                    >
+                                                                                                        <tr
+                                    x-show="
+                                        form.client_mode === 'multiple'
+                                        && Array.isArray(form.company_ids)
+                                        && form.company_ids.filter(Boolean).length
+                                    "
+                                >
+                                    <td colspan="2">
+                                        <b>Additional Clients:</b>
+
+                                        <div class="mt-1 min-h-[34px] rounded border border-blue-600 bg-white px-3 py-2">
+
+                                            @foreach (\App\Models\Company::orderBy('company_name')->get(['id', 'company_name']) as $previewAdditionalCompany)
+                                                <div
+                                                    x-show="
+                                                        Array.isArray(form.company_ids)
+                                                        && form.company_ids
+                                                            .filter(Boolean)
+                                                            .map(String)
+                                                            .includes('{{ $previewAdditionalCompany->id }}')
+                                                    "
+                                                >
+                                                    {{ $previewAdditionalCompany->company_name }}
+                                                    (#{{ $previewAdditionalCompany->id }})
+
+</div>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                </tr>
+                                    </template>
+
+                                </tbody>
+                            </template>
+
+                        </table>
+<div class="section-title">Personnel Details</div>
+                                                                        <table class="preview-table">
                             <tr>
-                                <td class="w-1/2"><b>Primary Destination:</b> <span x-text="form.destination || '-'"></span></td>
-                                <td><b>Additional Stops:</b> <span x-text="form.additional_stops || 'None'"></span></td>
+                                <td>
+                                    <b>Employee Name:</b>
+                                    <span
+                                        x-text="preview.full_name || form.employee_name || '-'"
+                                    ></span>
+                                </td>
+
+                                <td>
+                                    <b>Employee ID:</b>
+                                    <span
+                                        x-text="preview.employee_code || form.employee_code || '-'"
+                                    ></span>
+                                </td>
                             </tr>
+
                             <tr>
-                                <td colspan="2"><b>Maps:</b> <span>Open in Google Maps    Tip: type a place/address and click Maps.</span></td>
+                                <td>
+                                    <b>Position:</b>
+                                    <span
+                                        x-text="preview.position || form.position || '-'"
+                                    ></span>
+                                </td>
+
+                                <td>
+                                    <b>Department / Unit:</b>
+                                    <span
+                                        x-text="preview.department || form.department || '-'"
+                                    ></span>
+                                </td>
                             </tr>
-                            <tr>
-                                <td><b>Travel Purpose:</b> <span x-text="purposeText()"></span></td>
-                                <td><b>If Others, specify:</b> <span x-text="form.purpose_other || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Departure Date & Time:</b> <span x-text="dateTimeText(form.date_from, form.departure_time)"></span></td>
-                                <td><b>Return Date & Time:</b> <span x-text="dateTimeText(form.date_to, form.return_time)"></span></td>
-                            </tr>
-                            <tr>
-                                <td colspan="2"><b>Purpose Details:</b> <span x-text="form.purpose || '-'"></span></td>
+                                <tr>
+                                    <td colspan="2">
+                                        <b>Nature of Travel:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="
+                                                (
+                                                    preview.nature_of_travel
+                                                    || form.nature_of_travel
+                                                    || '-'
+                                                )
+                                            "
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                            <tr
+                                x-show="
+                                    Array.isArray(form.team_members)
+                                        ? form.team_members.some(
+                                            member =>
+                                                String(member || '').trim() !== ''
+                                        )
+                                        : String(form.team_members || '').trim() !== ''
+                                "
+                            >
+                                <td colspan="2">
+                                    <b>Team Members:</b>
+                                    <span x-text="teamText()"></span>
+                                </td>
                             </tr>
                         </table>
 
-                        <div class="section-title">B. Personnel Details</div>
-                        <table class="preview-table">
-                            <tr>
-                                <td><b>Employee Name:</b> <span x-text="preview.full_name || form.employee_name || '-'"></span></td>
-                                <td><b>Email Address:</b> <span x-text="preview.email || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Employee ID:</b> <span x-text="preview.employee_code || form.employee_code || '-'"></span></td>
-                                <td><b>Contact Number:</b> <span x-text="preview.phone_number || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Position:</b> <span x-text="preview.position || form.position || '-'"></span></td>
-                                <td><b>Department / Unit:</b> <span x-text="preview.department || form.department || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Immediate Superior:</b> <span x-text="form.immediate_superior || '-'"></span></td>
-                                <td><b>Superior Email:</b> <span x-text="form.superior_email || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Nature of Travel:</b> <span x-text="form.nature_of_travel || '-'"></span></td>
-                                <td><b>Team Members:</b> <span x-text="teamText()"></span></td>
-                            </tr>
+
+
+
+                        {{-- LIVE PREVIEW: TRAVEL INFORMATION --}}
+                                                {{-- YES CLIENT ONLY: TRAVEL INFORMATION --}}
+                        <template x-if="form.is_client_travel == '1'">
+                            <div>
+<div class="section-title">TRAVEL INFORMATION</div>
+
+                        <table class="preview-table text-xs">
+                            <tbody>
+
+                                <tr>
+                                    <td style="width:50%;">
+                                        <b>Primary Destination:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.destination || '-'"
+                                        ></span>
+                                    </td>
+
+                                    <td style="width:50%;">
+                                        <b>Trip Type:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.trip_type || '-'"
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td colspan="2">
+                                        <b>Additional Stops:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.additional_stops || '-'"
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td colspan="2">
+                                        <b>Travel Purpose Options:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="
+                                                Array.isArray(form.purpose_options)
+                                                && form.purpose_options.length
+                                                    ? form.purpose_options.join(', ')
+                                                    : '-'
+                                            "
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td colspan="2">
+                                        <b>Purpose / Details:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.purpose || '-'"
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                                <tr x-show="form.purpose_other">
+                                    <td colspan="2">
+                                        <b>If Others, specify:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.purpose_other || '-'"
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style="width:50%;">
+                                        <b>Departure Date:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.date_from || '-'"
+                                        ></span>
+                                    </td>
+
+                                    <td style="width:50%;">
+                                        <b>Return Date:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.date_to || '-'"
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style="width:50%;">
+                                        <b>Departure Time:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.departure_time || '-'"
+                                        ></span>
+                                    </td>
+
+                                    <td style="width:50%;">
+                                        <b>Return Time:</b>
+                                        <span
+                                            class="ml-1"
+                                            x-text="form.return_time || '-'"
+                                        ></span>
+                                    </td>
+                                </tr>
+
+                            </tbody>
                         </table>
 
-                        <div class="section-title">C. Client & Billability Section</div>
-                        <table class="preview-table">
-                            <tr>
-                                <td><b>Is this travel for a client?</b> <span x-text="form.is_client_travel == '1' ? 'Yes' : 'No'"></span></td>
-                                <td><b>Client Type:</b> <span x-text="form.client_type || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Client ID:</b> <span x-text="form.client_id_no || '-'"></span></td>
-                                <td><b>Client Name:</b> <span x-text="form.client_name || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Client Email:</b> <span x-text="form.client_email || '-'"></span></td>
-                                <td><b>Client Contract Number:</b> <span x-text="form.client_contract_number || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Contract Type:</b> <span x-text="form.contract_type || '-'"></span></td>
-                                <td><b>Travel Billability:</b> <span x-text="form.travel_billability || '-'"></span></td>
-                            </tr>
-                        </table>
 
-                        <div class="section-title">D. Client Payment Details</div>
-                        <table class="preview-table">
-                            <tr>
-                                <td><b>Will client pay?</b> <span x-text="form.client_payment_status || '-'"></span></td>
-                                <td><b>What will client pay for?</b> <span x-text="clientPaymentText()"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>If Others, specify:</b> <span x-text="form.client_payment_other || '-'"></span></td>
-                                <td><b>Amount Client Will Pay:</b> ₱<span x-text="form.amount_client_will_pay || '0.00'"></span></td>
-                            </tr>
-                        </table>
+                            </div>
+                        </template>
+                        {{-- YES CLIENT ONLY: CLIENT PAYMENT DETAILS --}}
+                        <template x-if="form.is_client_travel == '1'">
+                            <div>
 
-                        <div class="section-title">E. Travel Credits</div>
-                        <table class="preview-table">
-                            <tr>
-                                <td><b>Monthly Limit:</b> ₱<span x-text="form.travel_credit_monthly_limit || '-'"></span></td>
-                                <td><b>Used This Month:</b> ₱<span x-text="form.travel_credit_used || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Needed For Trip:</b> ₱<span x-text="form.travel_credit_needed || '-'"></span></td>
-                                <td><b>Remaining After Trip:</b> ₱<span x-text="form.travel_credit_remaining || '-'"></span></td>
-                            </tr>
-                        </table>
+                                <div class="section-title">CLIENT PAYMENT DETAILS</div>
 
-                        <div class="section-title">F. Mode of Transportation</div>
-                        <table class="preview-table">
-                            <tr>
-                                <td><b>Transportation Mode:</b> <span x-text="form.transportation_mode || '-'"></span></td>
-                                <td><b>Estimated Expenses:</b> ₱<span x-text="form.estimated_expenses || '0.00'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Company Vehicle:</b> <span x-text="form.company_vehicle || '-'"></span></td>
-                                <td><b>Assigned Driver:</b> <span x-text="form.assigned_driver || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Vehicle Details:</b> <span x-text="form.vehicle_details || '-'"></span></td>
-                                <td><b>Plate Number:</b> <span x-text="form.plate_number || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Odometer:</b> <span x-text="form.odometer || '-'"></span></td>
-                                <td><b>Fuel Level:</b> <span x-text="form.fuel_level || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Private Vehicle:</b> <span x-text="form.private_vehicle_details || '-'"></span></td>
-                                <td><b>Public Transport:</b> <span x-text="form.public_transport_details || '-'"></span></td>
-                            </tr>
-                            <tr>
-                                <td><b>Air Travel:</b> <span x-text="form.air_travel_details || '-'"></span></td>
-                                <td><b>Sea Travel:</b> <span x-text="form.sea_travel_details || '-'"></span></td>
-                            </tr>
-                        </table>
+                                <table class="preview-table text-xs">
+                                    <tbody>
 
-                        <div class="section-title">G. Attachments</div>
+                                        <tr>
+                                            <td style="width:50%;">
+                                                <b>Will client pay for this travel?</b>
+
+                                                <div class="mt-1 min-h-[34px] rounded border border-blue-600 bg-white px-3 py-2">
+                                                    <span
+                                                        x-text="form.client_payment_status || '-'"
+                                                    ></span>
+                                                </div>
+                                            </td>
+
+                                            <td style="width:50%;">
+                                                <b>What will client pay for?</b>
+
+                                                <div class="mt-1 min-h-[34px] rounded border border-blue-600 bg-white px-3 py-2">
+                                                    <span
+                                                        x-text="
+                                                            Array.isArray(form.client_payment_items)
+                                                            && form.client_payment_items.length
+                                                                ? form.client_payment_items.join(', ')
+                                                                : '-'
+                                                        "
+                                                    ></span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td style="width:50%;">
+                                                <b>If Others, specify:</b>
+
+                                                <div class="mt-1 min-h-[34px] rounded border border-blue-600 bg-white px-3 py-2">
+                                                    <span
+                                                        x-text="form.client_payment_other || '-'"
+                                                    ></span>
+                                                </div>
+                                            </td>
+
+                                            <td style="width:50%;">
+                                                <b>Amount Client Will Pay:</b>
+
+                                                <div class="mt-1 min-h-[34px] rounded border border-blue-600 bg-white px-3 py-2">
+                                                    <span
+                                                        x-text="
+                                                            form.amount_client_will_pay !== null
+                                                            && form.amount_client_will_pay !== undefined
+                                                            && form.amount_client_will_pay !== ''
+                                                                ? Number(form.amount_client_will_pay || 0).toFixed(2)
+                                                                : '0.00'
+                                                        "
+                                                    ></span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                    </tbody>
+                                </table>
+
+                            </div>
+                        </template>
+
+<div class="section-title">Mode of Transportation</div>
+
+<div class="obf-transport-mirror">
+
+    {{-- =====================================================
+         BASE ROW
+         Public Transport uses Mode in the second column.
+         All other modes use Estimated Expenses.
+         ===================================================== --}}
+
+    <div class="obf-transport-field">
+        <b>Transportation Mode:</b>
+        <div
+            class="obf-transport-value"
+            x-text="form.transportation_mode || '-'"
+        ></div>
+    </div>
+
+    <div class="obf-transport-field">
+
+        <template
+            x-if="
+                ['Public Transportation', 'Public Transport']
+                    .includes(form.transportation_mode)
+            "
+        >
+            <div>
+                <b>Mode:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.public_transport_mode || '-'"
+                ></div>
+            </div>
+        </template>
+
+        <template
+            x-if="
+                !['Public Transportation', 'Public Transport']
+                    .includes(form.transportation_mode)
+            "
+        >
+            <div>
+                <b>Estimated Expenses:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="
+                        form.estimated_expenses !== ''
+                        && form.estimated_expenses !== null
+                        && form.estimated_expenses !== undefined
+                            ? form.estimated_expenses
+                            : '0.00'
+                    "
+                ></div>
+            </div>
+        </template>
+
+    </div>
+
+
+    {{-- =====================================================
+         COMPANY VEHICLE
+         ===================================================== --}}
+
+    <template x-if="form.transportation_mode === 'Company Vehicle'">
+        <div class="obf-transport-contents">
+
+            <div class="obf-transport-field">
+                <b>Vehicle:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.company_vehicle || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Plate Number:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.plate_number || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Driver:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.assigned_driver || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Vehicle Details:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.vehicle_details || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Odometer:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.odometer || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Fuel Level:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.fuel_level || '-'"
+                ></div>
+            </div>
+
+        </div>
+    </template>
+
+
+    {{-- =====================================================
+         PERSONAL / PRIVATE VEHICLE
+         ===================================================== --}}
+
+    <template
+        x-if="
+            ['Personal Vehicle', 'Private Vehicle']
+                .includes(form.transportation_mode)
+        "
+    >
+        <div class="obf-transport-contents">
+
+            <div class="obf-transport-field">
+                <b>Vehicle Details:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.private_vehicle_details || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Plate Number:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.plate_number || '-'"
+                ></div>
+            </div>
+
+        </div>
+    </template>
+
+
+    {{-- =====================================================
+         TAXI / RIDE-HAILING
+         ===================================================== --}}
+
+    <template x-if="form.transportation_mode === 'Taxi / Ride-Hailing'">
+        <div class="obf-transport-contents">
+
+            <div class="obf-transport-field">
+                <b>Provider:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.ride_hailing_provider || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Estimated / Actual Cost:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="
+                        form.transportation_cost !== ''
+                        && form.transportation_cost !== null
+                        && form.transportation_cost !== undefined
+                            ? form.transportation_cost
+                            : '-'
+                    "
+                ></div>
+            </div>
+
+        </div>
+    </template>
+
+
+    {{-- =====================================================
+         PUBLIC TRANSPORT
+         Top-right Mode is already rendered in BASE ROW.
+         ===================================================== --}}
+
+    <template
+        x-if="
+            ['Public Transportation', 'Public Transport']
+                .includes(form.transportation_mode)
+        "
+    >
+        <div class="obf-transport-contents">
+
+            <div class="obf-transport-field">
+                <b>Details:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.public_transport_details || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Cost:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="
+                        form.transportation_cost !== ''
+                        && form.transportation_cost !== null
+                        && form.transportation_cost !== undefined
+                            ? form.transportation_cost
+                            : '-'
+                    "
+                ></div>
+            </div>
+
+        </div>
+    </template>
+
+
+    {{-- =====================================================
+         AIR / SEA
+         ===================================================== --}}
+
+    <template
+        x-if="
+            ['Air / Sea', 'Air Travel', 'Sea Travel']
+                .includes(form.transportation_mode)
+        "
+    >
+        <div class="obf-transport-contents">
+
+            <div class="obf-transport-field">
+                <b>Carrier:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.carrier || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Route:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.transport_route || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Booking / Reference:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.booking_reference || '-'"
+                ></div>
+            </div>
+
+            <div class="obf-transport-field">
+                <b>Cost:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="
+                        form.transportation_cost !== ''
+                        && form.transportation_cost !== null
+                        && form.transportation_cost !== undefined
+                            ? form.transportation_cost
+                            : '-'
+                    "
+                ></div>
+            </div>
+
+            <template x-if="form.transportation_mode === 'Air Travel'">
+                <div class="obf-transport-field">
+                    <b>Legacy Air Details:</b>
+                    <div
+                        class="obf-transport-value"
+                        x-text="form.air_travel_details || '-'"
+                    ></div>
+                </div>
+            </template>
+
+            <template x-if="form.transportation_mode === 'Sea Travel'">
+                <div class="obf-transport-field">
+                    <b>Legacy Sea Details:</b>
+                    <div
+                        class="obf-transport-value"
+                        x-text="form.sea_travel_details || '-'"
+                    ></div>
+                </div>
+            </template>
+
+        </div>
+    </template>
+
+
+    {{-- =====================================================
+         OTHER
+         ===================================================== --}}
+
+    <template x-if="form.transportation_mode === 'Other'">
+        <div class="obf-transport-full">
+
+            <div class="obf-transport-field">
+                <b>Transportation Description:</b>
+                <div
+                    class="obf-transport-value"
+                    x-text="form.other_transportation || '-'"
+                ></div>
+            </div>
+
+        </div>
+    </template>
+
+</div>
+<div class="section-title">Attachments</div>
                         <table class="preview-table">
                             <tr>
-                                <td><b>Attachment Types:</b> <span x-text="attachmentText()"></span></td>
+                                <td><b>Attachment Types:</b> <span x-text="attachmentText() || '-'"></span></td>
                                 <td><b>If Others, specify:</b> <span x-text="form.attachment_other || '-'"></span></td>
                             </tr>
-                            <tr>
-                                <td colspan="2"><b>Remarks:</b> <span x-text="form.remarks || '-'"></span></td>
-                            </tr>
+
                         </table>
 
                         <div class="grid grid-cols-3 gap-8 mt-10 text-center">
                             <div>
-                                <div class="border-t border-gray-700 pt-1">Requester</div>
+
+                        {{-- LIVE PREVIEW: REMARKS --}}
+                        <div class="section-title">REMARKS</div>
+
+                        <table class="preview-table text-xs">
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <span x-text="form.remarks || '-'"></span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+<div class="border-t border-gray-700 pt-1">Requester</div>
                             </div>
                             <div>
                                 <div class="border-t border-gray-700 pt-1">Immediate Superior</div>
@@ -330,8 +1117,11 @@
                         enctype="multipart/form-data"
                         :action="isEdit ? `{{ url('/human-capital/obf') }}/${form.id}` : `{{ url('/human-capital/obf') }}`"
                         class="p-5 space-y-6"
-                    >
+                     novalidate>
                         @csrf
+
+                        <input type="hidden" name="ob_reference_no" :value="form.ob_reference_no || ''">
+
                         <template x-if="isEdit">
                             <input type="hidden" name="_method" value="PUT">
                         </template>
@@ -345,13 +1135,475 @@
 
                         {{-- A --}}
                         <section class="form-section">
-                            <h3 class="form-title">A. Travel Information</h3>
+                            <h3 class="form-title">Client & Billability Section</h3>
 
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label class="label">Primary Destination <span class="text-red-500">*</span></label>
-                                    <input name="destination" x-model="form.destination" :readonly="isView" required class="input">
+                                    <label class="label">Is this travel for a client?</label>
+
+                                    <input
+                                        type="hidden"
+                                        name="is_client_travel"
+                                        :value="form.is_client_travel"
+                                    >
+
+                                    <div
+                                        class="grid grid-cols-2 gap-2"
+                                        role="group"
+                                        aria-label="Is this travel for a client?"
+                                    >
+                                        <button
+                                            type="button"
+                                            @click="
+                                                if (!isView) {
+                                                    form.is_client_travel = '1';
+                                                    handleClientTravelChange();
+                                                }
+                                            "
+                                            :disabled="isView"
+                                            :aria-pressed="form.is_client_travel == '1'"
+                                            :class="
+                                                form.is_client_travel == '1'
+                                                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                                    : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50'
+                                            "
+                                            class="h-10 rounded-lg border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            Yes
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            @click="
+                                                if (!isView) {
+                                                    form.is_client_travel = '0';
+                                                    handleClientTravelChange();
+                                                }
+                                            "
+                                            :disabled="isView"
+                                            :aria-pressed="form.is_client_travel == '0'"
+                                            :class="
+                                                form.is_client_travel == '0'
+                                                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                                    : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50'
+                                            "
+                                            class="h-10 rounded-lg border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            No
+                                        </button>
+                                    </div>
+
+                                    <div
+                                        x-show="form.is_client_travel == '1' && form.client_mode === 'multiple'"
+                                        x-cloak
+                                        class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3"
+                                    >
+                                        <div class="flex items-center justify-between gap-3 mb-2">
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-800">Additional Clients</p>
+                                                <p class="text-[11px] text-gray-500">
+                                                    Each selected company will receive its own O.B. Trip Ticket.
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                @click="addClientCompany()"
+                                                x-show="!isView"
+                                                class="px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
+                                            >
+                                                + Add Client
+                                            </button>
+                                        </div>
+
+                                        <template x-for="(companyId, index) in form.company_ids" :key="index">
+                                            <div class="flex items-center gap-2 mt-2">
+                                                <select
+                                                    name="company_ids[]"
+                                                    x-model="form.company_ids[index]"
+                                                    :disabled="isView"
+                                                    class="input flex-1"
+                                                >
+                                                    <option value="">Select additional company</option>
+                                                    @foreach (\App\Models\Company::orderBy('company_name')->get(['id', 'company_name']) as $additionalCompany)
+                                                        <option value="{{ $additionalCompany->id }}">{{ $additionalCompany->company_name }} (#{{ $additionalCompany->id }})</option>
+                                                    @endforeach
+                                                </select>
+
+                                                <button
+                                                    type="button"
+                                                    @click="removeClientCompany(index)"
+                                                    x-show="!isView"
+                                                    class="px-3 py-2 rounded-md border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </template>
+
+                                        <p
+                                            x-show="form.company_ids.length === 0"
+                                            class="mt-2 text-xs text-gray-500"
+                                        >
+                                            Click Add Client to select another client.
+                                        </p>
+
+                                        <p class="mt-2 text-[11px] text-blue-700">
+                                            A Multiple Client O.B. requires at least two different companies, including the Primary Client.
+                                        </p>
+                                    </div>
+
                                 </div>
+
+                                <div x-show="form.is_client_travel == '1'" x-cloak>
+                                    <label class="label">Client Coverage</label>
+                                    <select
+                                        name="client_mode"
+                                        x-model="form.client_mode"
+                                        @change="handleClientModeChange()"
+                                        :disabled="isView"
+                                        class="input mb-3"
+                                    >
+                                        <option value="single">Single Client</option>
+                                        <option value="multiple">Multiple Clients</option>
+                                    </select>
+
+                                    <label class="label" x-text="form.client_mode === 'multiple' ? 'Primary Client' : 'Select Client Contact'"></label>
+                                    <select name="contact_id" x-model="form.client_contact_id" @change="selectClientContact()" :disabled="isView" class="input">
+                                        <option value="">Select contact from Contacts</option>
+                                        <template x-for="contact in contacts" :key="contact.id">
+                                            <option :value="contact.id" x-text="contact.label"></option>
+                                        </template>
+                                    </select>
+                                    <p class="mt-1 text-[11px] text-gray-400">This auto-fills the client details below from the Contacts module.</p>
+
+                                </div>
+
+                                                                <div
+                                    x-show="
+                                        form.is_client_travel == '1'
+                                        && form.client_mode === 'multiple'
+                                    "
+                                    x-cloak
+                                    class="col-span-2 rounded-lg border border-blue-200 bg-blue-50/40 p-4"
+                                >
+                                    <div class="mb-3">
+                                        <p class="text-sm font-semibold text-gray-800">
+                                            Per-Client Destinations
+                                        </p>
+
+                                        <p class="text-[11px] text-gray-500">
+                                            Each selected client must have its own destination.
+                                        </p>
+                                    </div>
+
+                                    <div class="space-y-3">
+                                        <template
+                                            x-for="(clientId, routeIndex) in multipleClientIds()"
+                                            :key="clientId"
+                                        >
+                                            <div
+                                                x-init="ensureClientRoute(clientId)"
+                                                class="rounded-lg border border-gray-200 bg-white p-3"
+                                            >
+                                                <p class="mb-3 text-xs font-bold text-blue-700 break-words overflow-hidden">
+                                                    Client
+                                                    <span x-text="routeIndex + 1"></span>
+                                                    <span x-text="companyName(clientId)"></span>
+                                                </p>
+
+                                                <input
+                                                    type="hidden"
+                                                    :name="`client_routes[${routeIndex}][company_id]`"
+                                                    :value="clientId"
+                                                >
+
+                                                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                                    <div>
+                                                        <label class="label">
+                                                            Destination
+                                                            <span class="text-red-500">*</span>
+                                                        </label>
+
+                                                        <input
+                                                            type="text"
+                                                            :name="`client_routes[${routeIndex}][destination]`"
+                                                            x-model="ensureClientRoute(clientId).destination"
+                                                            list="obfDestinationSuggestions"
+                                                            :readonly="isView"
+                                                            :required="
+                                                                !isView
+                                                                && form.client_mode === 'multiple'
+                                                            "
+                                                            placeholder="e.g. ABC Company Office / BIR Cebu"
+                                                            class="input"
+                                                        >
+                                                    </div>
+
+                                                    <div>
+                                                        <label class="label">
+                                                            Activity / Purpose
+                                                        </label>
+
+                                                        <input
+                                                            type="text"
+                                                            :name="`client_routes[${routeIndex}][activity]`"
+                                                            x-model="ensureClientRoute(clientId).activity"
+                                                            :readonly="isView"
+                                                            placeholder="e.g. Client meeting / Submit BIR requirement"
+                                                            class="input"
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <p
+                                            x-show="multipleClientIds().length < 2"
+                                            class="text-xs font-semibold text-amber-600"
+                                        >
+                                            Multiple Client O.B. requires at least two clients.
+                                        </p>
+                                    </div>
+                                </div>
+                                {{-- OBF-NO-CLIENT-DETAILS --}}
+                                <div
+                                    x-show="form.is_client_travel == '0'"
+                                    x-cloak
+                                    class="col-span-2"
+                                >
+                                    <div class="grid grid-cols-2 gap-4">
+
+                                        <div class="col-span-2">
+                                            <label class="label">
+                                                Travel Purpose Options
+                                            </label>
+
+                                            <div class="grid grid-cols-3 gap-2 text-sm">
+                                                <template
+                                                    x-for="option in purposeOptionList.filter(option => option !== 'Client Meeting')"
+                                                    :key="`internal-${option}`"
+                                                >
+                                                    <label class="check-card">
+                                                        <input
+                                                            type="checkbox"
+                                                            :value="option"
+                                                            x-model="form.purpose_options"
+                                                            :disabled="isView"
+                                                        >
+                                                        <span x-text="option"></span>
+                                                    </label>
+                                                </template>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-span-2">
+                                            <label class="label">
+                                                Purpose / Details
+                                                <span class="text-red-500">*</span>
+                                            </label>
+
+                                            <textarea
+                                                x-model="form.purpose"
+                                                :readonly="isView"
+                                                rows="4"
+                                                class="input"
+                                            ></textarea>
+                                        </div>
+
+                                        <div class="col-span-2">
+                                            <label class="label">
+                                                If Others, specify
+                                            </label>
+
+                                            <input
+                                                type="text"
+                                                x-model="form.purpose_other"
+                                                :readonly="isView"
+                                                class="input"
+                                            >
+                                        </div>
+
+                                        <div>
+                                            <label class="label">
+                                                Departure Date
+                                                <span class="text-red-500">*</span>
+                                            </label>
+
+                                            <input
+                                                type="date"
+                                                x-model="form.date_from"
+                                                :readonly="isView"
+                                                class="input"
+                                            >
+                                        </div>
+
+                                        <div>
+                                            <label class="label">
+                                                Return Date
+                                            </label>
+
+                                            <input
+                                                type="date"
+                                                x-model="form.date_to"
+                                                :readonly="isView"
+                                                class="input"
+                                            >
+                                        </div>
+
+                                        <div>
+                                            <label class="label">
+                                                Departure Time
+                                            </label>
+
+                                            <input
+                                                type="time"
+                                                x-model="form.departure_time"
+                                                :readonly="isView"
+                                                class="input"
+                                            >
+                                        </div>
+
+                                        <div>
+                                            <label class="label">
+                                                Return Time
+                                            </label>
+
+                                            <input
+                                                type="time"
+                                                x-model="form.return_time"
+                                                :readonly="isView"
+                                                class="input"
+                                            >
+                                        </div>
+
+                                    </div>
+                                </div>
+<div x-show="form.is_client_travel == '1'" x-cloak>
+                                    <label class="label">Client Type</label>
+                                    <select name="client_type" x-model="form.client_type" :disabled="isView" class="input">
+                                        <option value="">Select client type</option>
+                                        <option>Local</option>
+                                        <option>International</option>
+                                    </select>
+                                </div>
+
+                                <div x-show="form.is_client_travel == '1'" x-cloak><label class="label">Client ID / CIF No.</label><input name="client_id_no" x-model="form.client_id_no" :readonly="isView" class="input"></div>
+                                <div x-show="form.is_client_travel == '1'" x-cloak><label class="label">Client Name</label><input name="client_name" x-model="form.client_name" :readonly="isView" class="input"></div>
+                                <div x-show="form.is_client_travel == '1'" x-cloak><label class="label">Client Email</label><input type="email" name="client_email" x-model="form.client_email" :readonly="isView" class="input"></div>
+                                <div x-show="form.is_client_travel == '1'" x-cloak><label class="label">Client Contact Number</label><input x-model="selectedClientPhone" readonly class="input bg-gray-100"></div>
+                                <div x-show="form.is_client_travel == '1'" x-cloak><label class="label">Company / Business Name</label><input x-model="selectedClientCompany" readonly class="input bg-gray-100"></div>
+                                <div x-show="form.is_client_travel == '1'" x-cloak><label class="label">Contract Number</label><input name="client_contract_number" x-model="form.client_contract_number" :readonly="isView" class="input"></div>
+                                <div x-show="form.is_client_travel == '1'" x-cloak><label class="label">Contract Type</label><input name="contract_type" x-model="form.contract_type" :readonly="isView" class="input"></div>
+
+                                <div x-show="form.is_client_travel == '1'" x-cloak>
+                                    <label class="label">Travel Billability</label>
+                                    <select name="travel_billability" x-model="form.travel_billability" :disabled="isView" class="input">
+                                        <option value="">Select billability</option>
+                                        <option>Billable</option>
+                                        <option>Non-billable</option>
+                                        <option>Partially Billable</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </section>
+
+                        {{-- B --}}
+                        <section class="form-section">
+                            <h3 class="form-title">Personnel Details</h3>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="col-span-2">
+                                    <label class="label">Employee <span class="text-red-500">*</span></label>
+                                    <select
+                                        name="employee_id"
+                                        x-model="form.employee_id"
+                                        @change="selectEmployee()"
+                                        :disabled="
+                                            isView
+                                            || (
+                                                isEdit
+                                                && !(
+                                                    Number(form.workflow_version || 1) >= 3
+                                                    && ['Draft', 'Reverted'].includes(form.status)
+                                                )
+                                            )
+                                        "
+                                        required
+                                        class="input bg-white disabled:bg-gray-100"
+                                    >
+                                        <option value="">Select employee</option>
+                                        <template x-for="employee in employees" :key="employee.id">
+                                            <option :value="employee.id" x-text="`${employee.employee_code} - ${employee.full_name}`"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                <div><label class="label">Employee ID</label><input x-model="preview.employee_code" readonly class="input bg-gray-100"></div>
+                                <div class="hidden"><label class="label">Email</label><input x-model="preview.email" readonly class="input bg-gray-100"></div>
+                                <div class="hidden"><label class="label">Contact Number</label><input x-model="preview.phone_number" readonly class="input bg-gray-100"></div>
+                                <div><label class="label">Position</label><input x-model="preview.position" readonly class="input bg-gray-100"></div>
+                                <div><label class="label">Department / Unit</label><input x-model="preview.department" readonly class="input bg-gray-100"></div>
+
+                                <div>
+                                    <label class="label">Nature of Travel</label>
+                                    <select name="nature_of_travel" x-model="form.nature_of_travel" :disabled="isView" class="input">
+                                        <option value="">Select nature</option>
+                                        <option>Individual</option>
+                                        <option>Team</option>
+                                    </select>
+                                </div>
+
+                                <div><label class="label">Immediate Superior</label><input name="immediate_superior" x-model="form.immediate_superior" :readonly="isView" class="input"></div>
+                                <div><label class="label">Superior Email</label><input type="email" name="superior_email" x-model="form.superior_email" :readonly="isView" class="input"></div>
+
+                                <div class="col-span-2">
+                                    <label class="label">Team Members</label>
+                                    <div class="grid grid-cols-3 gap-3" x-show="!form.legacy_team_members">
+                                        <template x-for="(memberId, index) in form.team_member_employee_ids" :key="index">
+                                            <select name="team_member_employee_ids[]" x-model="form.team_member_employee_ids[index]" @change="syncTeamNames()" :disabled="isView || form.legacy_team_members" class="input bg-white">
+                                                <option value="">Select employee</option>
+                                                <template x-for="employee in personnelEmployees" :key="employee.id">
+                                                    <option :value="employee.id" x-text="`${employee.employee_code} - ${employee.full_name}`"></option>
+                                                </template>
+                                            </select>
+                                        </template>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-3" x-show="form.legacy_team_members">
+                                        <template x-for="(member, index) in form.team_members" :key="index">
+                                            <input name="team_members[]" x-model="form.team_members[index]" :disabled="!form.legacy_team_members" :readonly="isView" :placeholder="`Team member ${index + 1}`" class="input">
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        {{-- C --}}
+                        <section class="form-section" x-show="form.is_client_travel == '1'" x-cloak>
+                            <h3 class="form-title">Travel Information</h3>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div x-show="form.client_mode !== 'multiple'" x-cloak>
+                                    <label class="label">
+                                        Primary Destination
+                                        <span class="text-red-500">*</span>
+                                    </label>
+
+                                    <input
+                                        name="destination"
+                                        x-model="form.destination"
+                                        list="obfDestinationSuggestions"
+                                        :readonly="isView"
+                                        :required="form.client_mode !== 'multiple'"
+                                        class="input"
+                                    >
+                                </div>
+
+                                <datalist id="obfDestinationSuggestions">
+                                    <template x-for="destination in destinationSuggestions" :key="destination">
+                                        <option :value="destination"></option>
+                                    </template>
+                                </datalist>
 
                                 <div>
                                     <label class="label">Trip Type</label>
@@ -412,106 +1664,13 @@
                             </div>
                         </section>
 
-                        {{-- B --}}
-                        <section class="form-section">
-                            <h3 class="form-title">B. Personnel Details</h3>
-
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="col-span-2">
-                                    <label class="label">Employee <span class="text-red-500">*</span></label>
-                                    <select name="employee_id" x-model="form.employee_id" @change="selectEmployee()" :disabled="isView || isEdit" required class="input bg-white disabled:bg-gray-100">
-                                        <option value="">Select employee</option>
-                                        <template x-for="employee in employees" :key="employee.id">
-                                            <option :value="employee.id" x-text="`${employee.employee_code} - ${employee.full_name}`"></option>
-                                        </template>
-                                    </select>
-                                </div>
-
-                                <div><label class="label">Employee ID</label><input x-model="preview.employee_code" readonly class="input bg-gray-100"></div>
-                                <div><label class="label">Email</label><input x-model="preview.email" readonly class="input bg-gray-100"></div>
-                                <div><label class="label">Contact Number</label><input x-model="preview.phone_number" readonly class="input bg-gray-100"></div>
-                                <div><label class="label">Position</label><input x-model="preview.position" readonly class="input bg-gray-100"></div>
-                                <div><label class="label">Department / Unit</label><input x-model="preview.department" readonly class="input bg-gray-100"></div>
-
-                                <div>
-                                    <label class="label">Nature of Travel</label>
-                                    <select name="nature_of_travel" x-model="form.nature_of_travel" :disabled="isView" class="input">
-                                        <option value="">Select nature</option>
-                                        <option>Individual</option>
-                                        <option>Team</option>
-                                    </select>
-                                </div>
-
-                                <div><label class="label">Immediate Superior</label><input name="immediate_superior" x-model="form.immediate_superior" :readonly="isView" class="input"></div>
-                                <div><label class="label">Superior Email</label><input type="email" name="superior_email" x-model="form.superior_email" :readonly="isView" class="input"></div>
-
-                                <div class="col-span-2">
-                                    <label class="label">Team Members</label>
-                                    <div class="grid grid-cols-3 gap-3">
-                                        <template x-for="(member, index) in form.team_members" :key="index">
-                                            <input name="team_members[]" x-model="form.team_members[index]" :readonly="isView" :placeholder="`Team member ${index + 1}`" class="input">
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        {{-- C --}}
-                        <section class="form-section">
-                            <h3 class="form-title">C. Client & Billability Section</h3>
-
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="label">Is this travel for a client?</label>
-                                    <select name="is_client_travel" x-model="form.is_client_travel" @change="handleClientTravelChange()" :disabled="isView" class="input">
-                                        <option value="0">No</option>
-                                        <option value="1">Yes</option>
-                                    </select>
-                                </div>
-
-                                <div x-show="form.is_client_travel == '1'" x-cloak>
-                                    <label class="label">Select Client Contact</label>
-                                    <select x-model="form.client_contact_id" @change="selectClientContact()" :disabled="isView" class="input">
-                                        <option value="">Select contact from Contacts</option>
-                                        <template x-for="contact in contacts" :key="contact.id">
-                                            <option :value="contact.id" x-text="contact.label"></option>
-                                        </template>
-                                    </select>
-                                    <p class="mt-1 text-[11px] text-gray-400">This auto-fills the client details below from the Contacts module.</p>
-                                </div>
-
-                                <div>
-                                    <label class="label">Client Type</label>
-                                    <select name="client_type" x-model="form.client_type" :disabled="isView" class="input">
-                                        <option value="">Select client type</option>
-                                        <option>Local</option>
-                                        <option>International</option>
-                                    </select>
-                                </div>
-
-                                <div><label class="label">Client ID / CIF No.</label><input name="client_id_no" x-model="form.client_id_no" :readonly="isView" class="input"></div>
-                                <div><label class="label">Client Name</label><input name="client_name" x-model="form.client_name" :readonly="isView" class="input"></div>
-                                <div><label class="label">Client Email</label><input type="email" name="client_email" x-model="form.client_email" :readonly="isView" class="input"></div>
-                                <div><label class="label">Client Contact Number</label><input x-model="selectedClientPhone" readonly class="input bg-gray-100"></div>
-                                <div><label class="label">Company / Business Name</label><input x-model="selectedClientCompany" readonly class="input bg-gray-100"></div>
-                                <div><label class="label">Contract Number</label><input name="client_contract_number" x-model="form.client_contract_number" :readonly="isView" class="input"></div>
-                                <div><label class="label">Contract Type</label><input name="contract_type" x-model="form.contract_type" :readonly="isView" class="input"></div>
-
-                                <div>
-                                    <label class="label">Travel Billability</label>
-                                    <select name="travel_billability" x-model="form.travel_billability" :disabled="isView" class="input">
-                                        <option value="">Select billability</option>
-                                        <option>Billable</option>
-                                        <option>Non-billable</option>
-                                        <option>Partially Billable</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </section>
-
                         {{-- D --}}
-                        <section class="form-section">
-                            <h3 class="form-title">D. Client Payment Details</h3>
+                        <section
+                            class="form-section"
+                            x-show="form.is_client_travel == '1'"
+                            x-cloak
+                        >
+                            <h3 class="form-title">Client Payment Details</h3>
 
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -543,20 +1702,11 @@
                         </section>
 
                         {{-- E --}}
-                        <section class="form-section">
-                            <h3 class="form-title">E. Travel Credits</h3>
 
-                            <div class="grid grid-cols-4 gap-4">
-                                <div><label class="label">Monthly Limit</label><input type="number" step="0.01" name="travel_credit_monthly_limit" x-model="form.travel_credit_monthly_limit" :readonly="isView" class="input"></div>
-                                <div><label class="label">Used This Month</label><input type="number" step="0.01" name="travel_credit_used" x-model="form.travel_credit_used" :readonly="isView" class="input"></div>
-                                <div><label class="label">Needed For Trip</label><input type="number" step="0.01" name="travel_credit_needed" x-model="form.travel_credit_needed" :readonly="isView" class="input"></div>
-                                <div><label class="label">Remaining After Trip</label><input type="number" step="0.01" name="travel_credit_remaining" x-model="form.travel_credit_remaining" :readonly="isView" class="input"></div>
-                            </div>
-                        </section>
 
                         {{-- F --}}
                         <section class="form-section">
-                            <h3 class="form-title">F. Mode of Transportation</h3>
+                            <h3 class="form-title">Mode of Transportation</h3>
 
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -564,30 +1714,131 @@
                                     <select name="transportation_mode" x-model="form.transportation_mode" :disabled="isView" class="input">
                                         <option value="">Select mode</option>
                                         <option>Company Vehicle</option>
-                                        <option>Private Vehicle</option>
-                                        <option>Public Transport</option>
-                                        <option>Air Travel</option>
-                                        <option>Sea Travel</option>
+                                        <option>Personal Vehicle</option>
+                                        <option>Taxi / Ride-Hailing</option>
+                                        <option>Public Transportation</option>
+                                        <option>Air / Sea</option>
+                                        <option>Other</option>
+                                        <option value="Private Vehicle">Private Vehicle (Legacy)</option>
+                                        <option value="Public Transport">Public Transport (Legacy)</option>
+                                        <option value="Air Travel">Air Travel (Legacy)</option>
+                                        <option value="Sea Travel">Sea Travel (Legacy)</option>
                                     </select>
                                 </div>
 
-                                <div><label class="label">Estimated Expenses</label><input type="number" step="0.01" name="estimated_expenses" x-model="form.estimated_expenses" :readonly="isView" class="input"></div>
-                                <div><label class="label">Company Vehicle</label><input name="company_vehicle" x-model="form.company_vehicle" :readonly="isView" class="input"></div>
-                                <div><label class="label">Assigned Driver</label><input name="assigned_driver" x-model="form.assigned_driver" :readonly="isView" class="input"></div>
-                                <div><label class="label">Vehicle Details</label><input name="vehicle_details" x-model="form.vehicle_details" :readonly="isView" class="input"></div>
-                                <div><label class="label">Plate Number</label><input name="plate_number" x-model="form.plate_number" :readonly="isView" class="input"></div>
-                                <div><label class="label">Odometer</label><input name="odometer" x-model="form.odometer" :readonly="isView" class="input"></div>
-                                <div><label class="label">Fuel Level</label><input name="fuel_level" x-model="form.fuel_level" :readonly="isView" class="input"></div>
-                                <div><label class="label">Private Vehicle Details</label><input name="private_vehicle_details" x-model="form.private_vehicle_details" :readonly="isView" class="input"></div>
-                                <div><label class="label">Public Transport Details</label><input name="public_transport_details" x-model="form.public_transport_details" :readonly="isView" class="input"></div>
-                                <div><label class="label">Air Travel Details</label><input name="air_travel_details" x-model="form.air_travel_details" :readonly="isView" class="input"></div>
-                                <div><label class="label">Sea Travel Details</label><input name="sea_travel_details" x-model="form.sea_travel_details" :readonly="isView" class="input"></div>
+                                <div>
+    <template
+        x-if="
+            ['Public Transportation', 'Public Transport']
+                .includes(form.transportation_mode)
+        "
+    >
+        <div>
+            <label class="label">Mode</label>
+            <input
+                name="public_transport_mode"
+                x-model="form.public_transport_mode"
+                :readonly="isView"
+                class="input"
+                placeholder="Bus, jeepney, train, etc."
+            >
+        </div>
+    </template>
+
+    <template
+        x-if="
+            !['Public Transportation', 'Public Transport']
+                .includes(form.transportation_mode)
+        "
+    >
+        <div>
+            <label class="label">Estimated Expenses</label>
+            <input
+                type="number"
+                step="0.01"
+                name="estimated_expenses"
+                x-model="form.estimated_expenses"
+                :readonly="isView"
+                class="input"
+            >
+        </div>
+    </template>
+</div>
+
+                                <template x-if="form.transportation_mode === 'Company Vehicle'">
+                                    <div class="col-span-2 grid grid-cols-2 gap-4">
+                                        <div><label class="label">Vehicle</label><input name="company_vehicle" x-model="form.company_vehicle" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Plate Number</label><input name="plate_number" x-model="form.plate_number" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Driver</label><input name="assigned_driver" x-model="form.assigned_driver" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Vehicle Details</label><input name="vehicle_details" x-model="form.vehicle_details" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Odometer</label><input name="odometer" x-model="form.odometer" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Fuel Level</label><input name="fuel_level" x-model="form.fuel_level" :readonly="isView" class="input"></div>
+                                    </div>
+                                </template>
+
+                                <template x-if="['Personal Vehicle', 'Private Vehicle'].includes(form.transportation_mode)">
+                                    <div class="col-span-2 grid grid-cols-2 gap-4">
+                                        <div><label class="label">Vehicle Details</label><input name="private_vehicle_details" x-model="form.private_vehicle_details" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Plate Number</label><input name="plate_number" x-model="form.plate_number" :readonly="isView" class="input"></div>
+                                    </div>
+                                </template>
+
+                                <template x-if="form.transportation_mode === 'Taxi / Ride-Hailing'">
+                                    <div class="col-span-2 grid grid-cols-2 gap-4">
+                                        <div><label class="label">Provider</label><input name="ride_hailing_provider" x-model="form.ride_hailing_provider" :readonly="isView" class="input" placeholder="Taxi, Grab, JoyRide, etc."></div>
+                                        <div><label class="label">Estimated / Actual Cost</label><input type="number" min="0" step="0.01" name="transportation_cost" x-model="form.transportation_cost" :readonly="isView" class="input"></div>
+                                    </div>
+                                </template>
+
+                                <template x-if="['Public Transportation', 'Public Transport'].includes(form.transportation_mode)">
+    <div class="col-span-2 grid grid-cols-2 gap-4">
+
+        <div>
+            <label class="label">Details</label>
+            <input
+                name="public_transport_details"
+                x-model="form.public_transport_details"
+                :readonly="isView"
+                class="input"
+            >
+        </div>
+
+        <div>
+            <label class="label">Cost</label>
+            <input
+                type="number"
+                min="0"
+                step="0.01"
+                name="transportation_cost"
+                x-model="form.transportation_cost"
+                :readonly="isView"
+                class="input"
+            >
+        </div>
+
+    </div>
+</template>
+
+                                <template x-if="['Air / Sea', 'Air Travel', 'Sea Travel'].includes(form.transportation_mode)">
+                                    <div class="col-span-2 grid grid-cols-2 gap-4">
+                                        <div><label class="label">Carrier</label><input name="carrier" x-model="form.carrier" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Route</label><input name="transport_route" x-model="form.transport_route" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Booking / Reference</label><input name="booking_reference" x-model="form.booking_reference" :readonly="isView" class="input"></div>
+                                        <div><label class="label">Cost</label><input type="number" min="0" step="0.01" name="transportation_cost" x-model="form.transportation_cost" :readonly="isView" class="input"></div>
+                                        <div x-show="form.transportation_mode === 'Air Travel'"><label class="label">Legacy Air Details</label><input name="air_travel_details" x-model="form.air_travel_details" :readonly="isView" class="input"></div>
+                                        <div x-show="form.transportation_mode === 'Sea Travel'"><label class="label">Legacy Sea Details</label><input name="sea_travel_details" x-model="form.sea_travel_details" :readonly="isView" class="input"></div>
+                                    </div>
+                                </template>
+
+                                <template x-if="form.transportation_mode === 'Other'">
+                                    <div class="col-span-2"><label class="label">Transportation Description</label><input name="other_transportation" x-model="form.other_transportation" :readonly="isView" class="input"></div>
+                                </template>
                             </div>
                         </section>
 
                         {{-- G --}}
                         <section class="form-section">
-                            <h3 class="form-title">G. Attachments</h3>
+                            <h3 class="form-title">Attachments</h3>
 
                             <div class="space-y-4">
                                 <div>
@@ -633,16 +1884,37 @@
                                 Cancel
                             </button>
 
-                            <template x-if="isView">
+                            <template x-if="isView && form.can_edit">
                                 <button type="button" @click="openEdit(form)" class="px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
                                     Edit OBF
                                 </button>
                             </template>
 
                             <template x-if="!isView">
-                                <button type="submit" class="px-6 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
-                                    <span x-text="isEdit ? 'Update OBF' : 'Submit OBF'"></span>
-                                </button>
+                                <div class="flex items-center gap-2">
+                                    <template
+                                        x-if="
+                                            !isEdit
+                                            || (
+                                                Number(form.workflow_version || 1) >= 3
+                                                && ['Draft', 'Reverted'].includes(form.status)
+                                            )
+                                        "
+                                    >
+                                        <button type="submit" name="intent" value="save_draft"
+                                            formnovalidate
+                                            class="px-5 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                                        >
+                                            Save Draft
+                                        </button>
+                                    </template>
+
+                                    <button type="submit" name="intent" value="submit"
+                                        class="px-6 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
+                                    >
+                                        <span x-text="isEdit && Number(form.workflow_version || 1) < 3 ? 'Update OBF' : 'Submit O.B.'"></span>
+                                    </button>
+                                </div>
                             </template>
                         </div>
                     </form>
@@ -832,15 +2104,51 @@
         padding: 28px;
     }
 }
+
+/* Remove only the far-left blue border from the OBF preview sheet */
+.print-area {
+    border-left: none !important;
+}
+
+.print-area::before,
+.print-area::after {
+    border-left: none !important;
+}
+
+/* Smart OBF print: Alpine-hidden information occupies no print space */
+.print-area [style*="display: none"] {
+    display: none !important;
+}
+
+@media print {
+    .print-area tr[style*="display: none"],
+    .print-area td[style*="display: none"],
+    .print-area .section-title[style*="display: none"],
+    .print-area .preview-table[style*="display: none"] {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+}
 </style>
 
 <script>
 function obfPage() {
     return {
         employees: @json($employees),
+        personnelEmployees: @json($personnelEmployees),
+        currentEmployeeId: @json($currentEmployee?->id),
         contacts: @json($contacts ?? []),
         trips: @json($trips),
+        get destinationSuggestions() {
+            return [...new Set(this.trips.flatMap(trip => [
+                trip.destination,
+                ...(trip.trip_tickets || []).flatMap(ticket => (ticket.stops || []).map(stop => stop.destination)),
+            ]).map(value => String(value || '').trim()).filter(Boolean))].sort();
+        },
         canManageObf: @json($canManageObf ?? false),
+        canApproveObf: @json($canApproveObf ?? false),
 
         showPanel: false,
         isEdit: false,
@@ -853,12 +2161,63 @@ function obfPage() {
         form: {},
         preview: {},
 
+        init() {
+            const parameters = new URLSearchParams(window.location.search);
+
+            if (parameters.get('create') === '1') {
+                this.openAdd();
+                return;
+            }
+
+            const tripId = Number(parameters.get('open'));
+            const trip = this.trips.find(item => Number(item.id) === tripId);
+
+            if (trip) {
+                this.openView(trip);
+                return;
+            }
+
+            const editTripId = Number(parameters.get('edit'));
+            const editableTrip = this.trips.find(item => Number(item.id) === editTripId);
+
+            if (editableTrip) {
+                this.openEdit(editableTrip);
+            }
+        },
+
         get panelTitle() {
             if (this.isView) return 'View Official Business Travel Form';
             if (this.isEdit) return 'Edit Official Business Travel Form';
             return 'New Official Business Travel Form';
         },
 
+        generatePreviewReference() {
+            const now = new Date();
+
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+
+            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let suffix = '';
+
+            if (window.crypto && window.crypto.getRandomValues) {
+                const values = new Uint32Array(5);
+                window.crypto.getRandomValues(values);
+
+                values.forEach(value => {
+                    suffix += alphabet[value % alphabet.length];
+                });
+            } else {
+                for (let index = 0; index < 5; index++) {
+                    suffix += alphabet[
+                        Math.floor(Math.random() * alphabet.length)
+                    ];
+                }
+            }
+
+            return `OBF-${year}${month}${day}-${suffix}`;
+        },
         blankForm() {
             return {
                 id: null,
@@ -879,13 +2238,18 @@ function obfPage() {
                 departure_time: '',
                 return_time: '',
                 nature_of_travel: '',
-                team_members: ['', '', ''],
+            team_members: ['', '', ''],
+            team_member_employee_ids: ['', '', ''],
+            legacy_team_members: false,
 
                 immediate_superior: '',
                 superior_email: '',
 
                 is_client_travel: '0',
-                client_contact_id: '',
+                client_mode: 'single',
+                company_id: '', client_contact_id: '',
+                company_ids: [],
+                client_route_map: {},
                 client_type: '',
                 client_id_no: '',
                 client_name: '',
@@ -915,6 +2279,13 @@ function obfPage() {
                 public_transport_details: '',
                 air_travel_details: '',
                 sea_travel_details: '',
+                ride_hailing_provider: '',
+                transportation_cost: '',
+                public_transport_mode: '',
+                carrier: '',
+                transport_route: '',
+                booking_reference: '',
+                other_transportation: '',
                 estimated_expenses: 0,
 
                 attachment_paths: [],
@@ -941,10 +2312,17 @@ function obfPage() {
             this.isView = false;
             this.isEdit = false;
             this.form = this.blankForm();
+            this.form.ob_reference_no = this.generatePreviewReference();
             this.preview = this.blankPreview();
-            if (!this.canManageObf && this.employees.length === 1) {
-                this.form.employee_id = this.employees[0].id;
-                this.selectEmployee();
+            if (this.currentEmployeeId) {
+                const currentEmployee = this.employees.find(
+                    employee => String(employee.id) === String(this.currentEmployeeId)
+                );
+
+                if (currentEmployee) {
+                    this.form.employee_id = currentEmployee.id;
+                    this.selectEmployee();
+                }
             }
             this.showPanel = true;
         },
@@ -953,14 +2331,19 @@ function obfPage() {
             this.isView = true;
             this.isEdit = false;
             this.form = this.hydrateTrip(trip);
+            this.hydrateClientRouteMap(trip);
             this.setPreviewFromTrip(trip);
             this.showPanel = true;
         },
 
         openEdit(trip) {
+            if (!trip.id || !trip.can_edit) return;
+
             this.isView = false;
             this.isEdit = true;
             this.form = this.hydrateTrip(trip);
+            this.hydrateClientRouteMap(trip);
+
             this.setPreviewFromTrip(trip);
             this.showPanel = true;
         },
@@ -982,8 +2365,26 @@ function obfPage() {
                 ...trip,
                 purpose_options: trip.purpose_options || [],
                 team_members: trip.team_members && trip.team_members.length ? [...trip.team_members, '', '', ''].slice(0, 3) : ['', '', ''],
+                team_member_employee_ids: Array.isArray(trip.team_member_employee_ids)
+                    ? [...trip.team_member_employee_ids, '', '', ''].slice(0, 3)
+                    : ['', '', ''],
+                legacy_team_members: Boolean(
+                    trip.team_members?.length && !trip.team_member_employee_ids?.length
+                ),
                 is_client_travel: trip.is_client_travel ? '1' : '0',
-                client_contact_id: trip.client_contact_id || '',
+                client_mode: (
+                    Array.isArray(trip.trip_tickets)
+                    && trip.trip_tickets.length > 1
+                ) ? 'multiple' : 'single',
+                company_id: trip.company_id || '', client_contact_id: trip.contact_id || '',
+                company_ids: Array.isArray(trip.trip_tickets)
+                    ? trip.trip_tickets
+                        .map(ticket => String(ticket.company_id || ''))
+                        .filter(companyId =>
+                            companyId
+                            && String(companyId) !== String(trip.company_id || '')
+                        )
+                    : [],
                 client_payment_items: trip.client_payment_items || [],
                 attachment_paths: trip.attachment_paths || [],
                 attachment_types: trip.attachment_types || [],
@@ -1001,6 +2402,13 @@ function obfPage() {
                 public_transport_details: transpo.public_transport_details || '',
                 air_travel_details: transpo.air_travel_details || '',
                 sea_travel_details: transpo.sea_travel_details || '',
+                ride_hailing_provider: transpo.ride_hailing_provider || '',
+                transportation_cost: transpo.transportation_cost || '',
+                public_transport_mode: transpo.public_transport_mode || '',
+                carrier: transpo.carrier || '',
+                transport_route: transpo.route || '',
+                booking_reference: transpo.booking_reference || '',
+                other_transportation: transpo.other_description || '',
             };
         },
 
@@ -1009,6 +2417,8 @@ function obfPage() {
 
             if (!employee) {
                 this.preview = this.blankPreview();
+                this.form.immediate_superior = '';
+                this.form.superior_email = '';
                 return;
             }
 
@@ -1020,6 +2430,17 @@ function obfPage() {
                 position: employee.position || '',
                 department: employee.department || '',
             };
+            this.form.immediate_superior = employee.immediate_superior || '';
+            this.form.superior_email = employee.superior_email || '';
+            this.syncTeamNames();
+        },
+
+        syncTeamNames() {
+            if (this.form.legacy_team_members) return;
+            this.form.team_members = (this.form.team_member_employee_ids || [])
+                .filter(id => id && String(id) !== String(this.form.employee_id))
+                .map(id => this.personnelEmployees.find(employee => String(employee.id) === String(id))?.full_name || '')
+                .filter(Boolean);
         },
 
         setPreviewFromTrip(trip) {
@@ -1053,7 +2474,10 @@ function obfPage() {
                 return;
             }
 
-            this.form.client_contact_id = '';
+            this.form.client_mode = 'single';
+            this.form.company_id = ''; this.form.client_contact_id = '';
+            this.form.company_ids = [];
+            this.form.client_route_map = {};
             this.form.client_type = '';
             this.form.client_id_no = '';
             this.form.client_name = '';
@@ -1063,7 +2487,151 @@ function obfPage() {
             this.form.travel_billability = '';
         },
 
+        handleClientModeChange() {
+            if (this.form.client_mode === 'multiple') {
+                if (!Array.isArray(this.form.company_ids)) {
+                    this.form.company_ids = [];
+                }
+
+                if (
+                    !this.form.client_route_map
+                    || typeof this.form.client_route_map !== 'object'
+                ) {
+                    this.form.client_route_map = {};
+                }
+
+                return;
+            }
+
+            this.form.company_ids = [];
+            this.form.client_route_map = {};
+        },
+
+        addClientCompany() {
+            if (!Array.isArray(this.form.company_ids)) {
+                this.form.company_ids = [];
+            }
+
+            this.form.company_ids.push('');
+        },
+
+        removeClientCompany(index) {
+            this.form.company_ids.splice(index, 1);
+        },
+
+        multipleClientIds() {
+            const ids = [
+                this.form.company_id,
+                ...(Array.isArray(this.form.company_ids)
+                    ? this.form.company_ids
+                    : []),
+            ]
+                .map(id => String(id || ''))
+                .filter(Boolean);
+
+            return ids.filter(
+                (id, index, values) => values.indexOf(id) === index
+            );
+        },
+
+        companyName(clientId) {
+            const option = document.querySelector(
+                `select[name="company_id"] option[value="${clientId}"]`
+            );
+
+            if (option) {
+                return option.textContent
+                    .replace(/\s+\(#\d+\)\s*$/, '')
+                    .trim();
+            }
+
+            return `Client ${clientId}`;
+        },
+
+        ensureClientRoute(clientId) {
+            if (
+                !this.form.client_route_map
+                || typeof this.form.client_route_map !== 'object'
+            ) {
+                this.form.client_route_map = {};
+            }
+
+            const key = String(clientId || '');
+
+            if (!key) {
+                return {
+                    destination: '',
+                    activity: '',
+                };
+            }
+
+            if (!this.form.client_route_map[key]) {
+                this.form.client_route_map[key] = {
+                    destination: '',
+                    activity: '',
+                };
+            }
+
+            return this.form.client_route_map[key];
+        },
+
+        hydrateClientRouteMap(trip) {
+            this.form.client_route_map = {};
+
+            if (!Array.isArray(trip.trip_tickets)) {
+                return;
+            }
+
+            trip.trip_tickets.forEach(ticket => {
+                const companyId = String(ticket.company_id || '');
+
+                if (!companyId) {
+                    return;
+                }
+
+                const stops = Array.isArray(ticket.stops)
+                    ? ticket.stops
+                    : [];
+
+                const primaryStop =
+                    stops.find(stop => Number(stop.sequence) === 1)
+                    || stops[0]
+                    || null;
+
+                this.form.client_route_map[companyId] = {
+                    destination:
+                        primaryStop?.destination
+                        || (
+                            String(trip.company_id || '') === companyId
+                                ? (trip.destination || '')
+                                : ''
+                        ),
+                    activity:
+                        primaryStop?.activity
+                        || (
+                            String(trip.company_id || '') === companyId
+                                ? (trip.purpose || '')
+                                : ''
+                        ),
+                };
+            });
+        },
         selectClientContact() {
+            if (!this.form.client_contact_id) {
+                this.form.company_id = '';
+                this.form.client_type = '';
+                this.form.client_id_no = '';
+                this.form.client_name = '';
+                this.form.client_email = '';
+                this.form.client_contact_number = '';
+                this.form.company_business_name = '';
+                this.form.contract_type = '';
+                this.form.travel_billability = '';
+                this.selectedClientPhone = '';
+    this.form.client_contract_number = '';
+                return;
+            }
+
             const contact = this.selectedClientContact();
 
             if (!contact) {
@@ -1079,6 +2647,99 @@ function obfPage() {
             this.form.contract_type = contact.contract_type || this.form.contract_type || '';
         },
 
+        printHasValue(value) {
+            if (value === null || value === undefined) {
+                return false;
+            }
+
+            if (Array.isArray(value)) {
+                return value.some(item => this.printHasValue(item));
+            }
+
+            if (typeof value === 'number') {
+                return Number.isFinite(value) && value !== 0;
+            }
+
+            const normalized = String(value).trim();
+
+            if (!normalized) {
+                return false;
+            }
+
+            return ![
+                '-',
+                'none',
+                'null',
+                'undefined',
+                '0',
+                '0.00',
+                'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±0',
+                'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±0.00'
+            ].includes(normalized.toLowerCase());
+        },
+
+        printHasAny(...values) {
+            return values.some(value => this.printHasValue(value));
+        },
+
+        printHasClient() {
+            return String(this.form.is_client_travel || '') === '1';
+        },
+
+        printHasClientPayment() {
+            if (!this.printHasClient()) {
+                return false;
+            }
+
+            return this.printHasAny(
+                this.form.client_payment_status,
+                this.form.client_payment_items,
+                this.form.client_payment_other,
+                this.form.amount_client_will_pay
+            );
+        },
+
+        printHasTravelCredits() {
+            return this.printHasAny(
+                this.form.travel_credit_monthly_limit,
+                this.form.travel_credit_used,
+                this.form.travel_credit_needed,
+                this.form.travel_credit_remaining
+            );
+        },
+
+        printHasTransportation() {
+            return this.printHasAny(
+                this.form.transportation_mode,
+                this.form.estimated_expenses,
+                this.form.company_vehicle,
+                this.form.assigned_driver,
+                this.form.vehicle_details,
+                this.form.plate_number,
+                this.form.odometer,
+                this.form.fuel_level,
+                this.form.private_vehicle_details,
+                this.form.public_transport_details,
+                this.form.air_travel_details,
+                this.form.sea_travel_details,
+                this.form.ride_hailing_provider,
+                this.form.transportation_cost,
+                this.form.public_transport_mode,
+                this.form.carrier,
+                this.form.transport_route,
+                this.form.booking_reference,
+                this.form.other_transportation
+            );
+        },
+
+        printHasAttachmentsOrRemarks() {
+            return this.printHasAny(
+                this.form.attachment_types,
+                this.form.attachment_other,
+                this.form.attachment_paths,
+                this.form.remarks
+            );
+        },
         purposeText() {
             const values = this.form.purpose_options || [];
             return values.length ? values.join(', ') : '-';
@@ -1105,7 +2766,12 @@ function obfPage() {
         },
 
         statusClass(status) {
-            if (status === 'Approved') return 'bg-green-100 text-green-700';
+            if (['Approved', 'Ready for Travel'].includes(status)) return 'bg-blue-100 text-blue-700';
+            if (['In Progress', 'Ongoing'].includes(status)) return 'bg-violet-100 text-violet-700';
+            if (['Returned', 'For Completion'].includes(status)) return 'bg-amber-100 text-amber-700';
+            if (status === 'Completed') return 'bg-green-100 text-green-700';
+            if (status === 'Submitted') return 'bg-cyan-100 text-cyan-700';
+            if (['Draft', 'Reverted'].includes(status)) return 'bg-orange-100 text-orange-700';
             if (status === 'Rejected') return 'bg-red-100 text-red-700';
             if (status === 'Cancelled') return 'bg-gray-100 text-gray-700';
             return 'bg-yellow-100 text-yellow-700';
@@ -1114,3 +2780,459 @@ function obfPage() {
 }
 </script>
 @endsection
+
+{{-- OBF-PRINT-COMPACT-FIX --}}
+<style>
+@media print {
+
+    @page {
+        size: A4 portrait;
+        margin: 8mm 10mm;
+    }
+
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+    }
+
+    /*
+     * Keep the printable OBF document compact.
+     * Do not preserve screen modal/container heights during printing.
+     */
+    .preview-document,
+    .preview-paper,
+    .obf-preview,
+    .print-area,
+    [data-print-area] {
+        width: 100% !important;
+        max-width: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+    }
+
+    /*
+     * Main document content.
+     */
+    .preview-document *,
+    .preview-paper *,
+    .obf-preview *,
+    .print-area * {
+        box-sizing: border-box !important;
+    }
+
+    /*
+     * Section headings.
+     */
+    .section-title {
+        margin-top: 10px !important;
+        margin-bottom: 5px !important;
+        padding: 6px 10px !important;
+        min-height: 0 !important;
+        line-height: 1.15 !important;
+        font-size: 10px !important;
+
+        break-after: avoid !important;
+        page-break-after: avoid !important;
+    }
+
+    /*
+     * First section should not have unnecessary top spacing.
+     */
+    .section-title:first-of-type {
+        margin-top: 5px !important;
+    }
+
+    /*
+     * Preview tables.
+     */
+    .preview-table {
+        width: 100% !important;
+        margin: 0 0 5px 0 !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
+        table-layout: fixed !important;
+
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+    }
+
+    .preview-table tr {
+        min-height: 0 !important;
+        height: auto !important;
+
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    .preview-table td,
+    .preview-table th {
+        padding: 4px 7px !important;
+        min-height: 0 !important;
+        height: auto !important;
+        line-height: 1.2 !important;
+        vertical-align: top !important;
+        font-size: 9px !important;
+    }
+
+    .preview-table td b,
+    .preview-table th b {
+        display: block !important;
+        margin-bottom: 2px !important;
+        line-height: 1.1 !important;
+        font-size: 8.5px !important;
+    }
+
+    .preview-table td span {
+        line-height: 1.15 !important;
+    }
+
+    /*
+     * Remove oversized spacing inherited from screen Tailwind classes.
+     */
+    .mt-1 {
+        margin-top: 2px !important;
+    }
+
+    .mt-2 {
+        margin-top: 3px !important;
+    }
+
+    .mt-3,
+    .mt-4 {
+        margin-top: 5px !important;
+    }
+
+    .mb-3,
+    .mb-4 {
+        margin-bottom: 5px !important;
+    }
+
+    .gap-4 {
+        gap: 6px !important;
+    }
+
+    .gap-3 {
+        gap: 5px !important;
+    }
+
+    .gap-2 {
+        gap: 4px !important;
+    }
+
+    /*
+     * Preview value boxes.
+     */
+    .preview-table .rounded-md,
+    .preview-table .rounded-lg,
+    .preview-table .rounded-xl {
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 4px 7px !important;
+        margin: 0 !important;
+        border-radius: 4px !important;
+    }
+
+    /*
+     * Prevent form-input styling from becoming tall in printed preview.
+     */
+    .preview-table input,
+    .preview-table select,
+    .preview-table textarea {
+        min-height: 0 !important;
+        height: auto !important;
+        padding: 3px 6px !important;
+        margin: 0 !important;
+        line-height: 1.15 !important;
+        font-size: 9px !important;
+    }
+
+    /*
+     * Long text should expand naturally instead of reserving empty height.
+     */
+    .preview-table textarea,
+    .preview-table .whitespace-pre-wrap {
+        min-height: 0 !important;
+        height: auto !important;
+    }
+
+    /*
+     * Don't force whole sections onto a new page.
+     * Only individual rows are protected from splitting.
+     */
+    .section-title + .preview-table {
+        break-before: avoid !important;
+        page-break-before: avoid !important;
+    }
+
+    /*
+     * Remove screen-only modal spacing.
+     */
+    .overflow-y-auto,
+    .overflow-auto {
+        overflow: visible !important;
+        max-height: none !important;
+        height: auto !important;
+    }
+
+    /*
+     * Hide controls in print.
+     */
+    button,
+    .no-print {
+        display: none !important;
+    }
+}
+</style>
+
+{{-- OBF-PUBLIC-TRANSPORT-PRINT-GRID --}}
+<style>
+@media print {
+    [x-cloak] {
+        display: none;
+    }
+
+    .obf-public-print-grid {
+        display: grid !important;
+        grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+</style>
+
+{{-- OBF-COMPANY-VEHICLE-5050 --}}
+<style>
+    /*
+     * Transportation preview always spans the full document width.
+     */
+    .obf-transport-preview-table {
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        table-layout: fixed !important;
+    }
+
+    /*
+     * Company Vehicle uses the exact same two-column structure
+     * as the fill-up form.
+     */
+    .obf-transport-preview-table .obf-company-vehicle-preview tr {
+        width: 100% !important;
+    }
+
+    .obf-transport-preview-table .obf-company-vehicle-preview td {
+        width: 50% !important;
+        min-width: 0 !important;
+        max-width: 50% !important;
+
+        box-sizing: border-box !important;
+        vertical-align: top !important;
+
+        overflow: hidden !important;
+    }
+
+    /*
+     * Long content cannot resize either 50% column.
+     */
+    .obf-transport-preview-table .obf-company-vehicle-preview td > span {
+        display: block !important;
+
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+
+        box-sizing: border-box !important;
+
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    @media print {
+        .obf-transport-preview-table {
+            width: 100% !important;
+            min-width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+        }
+
+        .obf-transport-preview-table .obf-company-vehicle-preview td {
+            width: 50% !important;
+            min-width: 0 !important;
+            max-width: 50% !important;
+        }
+    }
+</style>
+
+{{-- OBF-COMPANY-PREVIEW-FIXED-BOX --}}
+<style>
+    .obf-company-preview-field {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+
+    .obf-company-preview-field > b {
+        display: block !important;
+        color: #001b5f !important;
+        font-size: 11px !important;
+        margin-bottom: 0.3rem !important;
+    }
+
+    .obf-company-preview-value {
+        display: block !important;
+
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+
+        height: 36px !important;
+
+        padding: 8px 10px !important;
+
+        background: #f8fafc !important;
+        border: 1px solid #1d4ed8 !important;
+        border-radius: 5px !important;
+
+        color: #111827 !important;
+
+        box-sizing: border-box !important;
+
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    @media print {
+        .obf-company-preview-field {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+        }
+
+        .obf-company-preview-value {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+    }
+</style>
+
+{{-- OBF-TRANSPORT-MIRROR-V1 --}}
+<style>
+
+    /*
+     * Main C section:
+     * Transportation Mode | Second field
+     */
+    .obf-transport-mirror {
+        display: grid !important;
+        grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+
+        width: 100% !important;
+        max-width: 100% !important;
+
+        gap: 10px 12px !important;
+
+        box-sizing: border-box !important;
+    }
+
+    /*
+     * Mode-specific contents span the complete grid,
+     * but contain another equal 50/50 grid.
+     */
+    .obf-transport-contents {
+        grid-column: 1 / -1 !important;
+
+        display: grid !important;
+        grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+
+        width: 100% !important;
+        max-width: 100% !important;
+
+        gap: 10px 12px !important;
+
+        box-sizing: border-box !important;
+    }
+
+    .obf-transport-full {
+        grid-column: 1 / -1 !important;
+
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .obf-transport-field {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+
+        box-sizing: border-box !important;
+    }
+
+    .obf-transport-field b {
+        display: block !important;
+
+        color: #001b5f !important;
+        font-size: 11px !important;
+
+        margin-bottom: 0.3rem !important;
+    }
+
+    /*
+     * Match the standard preview boxes.
+     */
+    .obf-transport-value {
+        display: block !important;
+
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+
+        height: 36px !important;
+
+        padding: 8px 10px !important;
+
+        background: #f8fafc !important;
+
+        border: 1px solid #1d4ed8 !important;
+        border-radius: 5px !important;
+
+        color: #111827 !important;
+
+        box-sizing: border-box !important;
+
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    @media print {
+
+        .obf-transport-mirror,
+        .obf-transport-contents {
+            display: grid !important;
+
+            grid-template-columns:
+                minmax(0,1fr)
+                minmax(0,1fr) !important;
+
+            width: 100% !important;
+            max-width: 100% !important;
+
+            gap: 6px 8px !important;
+        }
+
+        .obf-transport-value {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+    }
+
+</style>

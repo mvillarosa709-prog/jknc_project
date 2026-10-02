@@ -1,6 +1,11 @@
 <?php
 
+require __DIR__.'/messaging.php';
+
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\TaskWorkflowController;
+use App\Http\Controllers\VisitorController;
+use App\Http\Controllers\VisitController;
 use App\Http\Controllers\AdminUserPasswordController;
 use App\Http\Controllers\AdminUserStatusController;
 use App\Http\Controllers\AdminUserAccountController;
@@ -11,7 +16,6 @@ use App\Http\Controllers\PasswordAssistanceController;
 use App\Http\Controllers\BylawController;
 use App\Http\Controllers\CapitalStructureController;
 use App\Http\Controllers\CatalogChangeRequestController;
-use App\Http\Controllers\CompanyActivityController;
 use App\Http\Controllers\CompanyConsultationNoteController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CompanyCorporateFormationController;
@@ -91,6 +95,8 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\DeploymentController;
 use App\Http\Controllers\OfficialBusinessTripController;
+use App\Http\Controllers\OfficialBusinessTripTicketController;
+use App\Http\Controllers\CompanyTravelCreditController;
 use App\Http\Controllers\EmployeeRelationController;
 use App\Http\Controllers\AwardController;
 use App\Http\Controllers\PerformanceController;
@@ -176,36 +182,122 @@ Route::post('/finance/supplier/completion/{token}', [FinanceController::class, '
 |--------------------------------------------------------------------------
 */
 
-Route::get('/activities', function () {
-    return view('activities.index');
-})->name('activities');
+Route::get('/official-business-trip-tickets/verify/{reference}', [OfficialBusinessTripTicketController::class, 'verify'])
+    ->middleware('throttle:60,1')
+    ->name('official-business-trip-tickets.verify');
 
-Route::prefix('api')->group(function () {
-    Route::get('/activities', [ActivityController::class, 'index']);
-    Route::post('/tasks', [ActivityController::class, 'storeTask']);
-    Route::post('/events', [ActivityController::class, 'storeEvent']);
-    Route::post('/calls', [ActivityController::class, 'storeCall']);
-    Route::post('/meetings', [ActivityController::class, 'storeMeeting']);
+Route::middleware(['auth', 'prevent-back-history', \App\Http\Middleware\EnsurePasswordChanged::class, 'human-capital.module:access_activities'])->group(function () {
+    Route::get('/activities', function () {
+        return view('activities.index');
+    })->name('activities');
 
-    Route::put('/tasks/{id}', [ActivityController::class, 'updateTask']);
-    Route::put('/events/{id}', [ActivityController::class, 'updateEvent']);
-    Route::put('/calls/{id}', [ActivityController::class, 'updateCall']);
-    Route::put('/meetings/{id}', [ActivityController::class, 'updateMeeting']);
+    Route::prefix('api')->group(function () {
+        Route::get('/activities', [ActivityController::class, 'index']);
+        Route::match(['get', 'post'], '/activities/report', [\App\Http\Controllers\ActivitiesReportController::class, 'dataset']);
+        Route::match(['get', 'post'], '/activities/export', [\App\Http\Controllers\ActivitiesReportController::class, 'export']);
+        Route::get('/activities/{type}/{id}/related', [\App\Http\Controllers\ActivityLinkController::class, 'index']);
+        Route::post('/activities/{type}/{id}/related', [\App\Http\Controllers\ActivityLinkController::class, 'store']);
+        Route::delete('/activities/{type}/{id}/related/{relatedType}/{relatedId}', [\App\Http\Controllers\ActivityLinkController::class, 'destroy']);
+        Route::get('/activities/{type}/{id}/attachments', [\App\Http\Controllers\ActivityAttachmentController::class, 'index']);
+        Route::post('/activities/{type}/{id}/attachments', [\App\Http\Controllers\ActivityAttachmentController::class, 'store']);
+        Route::delete('/activities/{type}/{id}/attachments/{attachment}', [\App\Http\Controllers\ActivityAttachmentController::class, 'destroy']);
+        Route::get('/activities/{type}/{id}/audit-log', [\App\Http\Controllers\ActivityAuditController::class, 'index']);
+        Route::get('/visitors', [VisitorController::class, 'index']);
+        Route::post('/visitors', [VisitorController::class, 'store']);
+        Route::get('/visits', [VisitController::class, 'index']);
+        Route::get('/visits/{visit}', [VisitController::class, 'show']);
+        Route::post('/visits/check-in', [VisitController::class, 'checkIn']);
+        Route::post('/visits/{visit}/check-out', [VisitController::class, 'checkOut']);
+        Route::get('/official-business', [OfficialBusinessTripController::class, 'activitiesIndex'])->name('activities.official-business.index');
+        Route::get('/official-business/deleted', [OfficialBusinessTripController::class, 'deletedActivitiesIndex'])->name('activities.official-business.deleted');
+        Route::post('/official-business/{id}/restore', [OfficialBusinessTripController::class, 'restoreDeleted'])->name('activities.official-business.restore');
+        Route::delete('/official-business/{id}/force', [OfficialBusinessTripController::class, 'forceDeleteDeleted'])->name('activities.official-business.force-delete');
+        Route::delete('/official-business/{officialBusinessTrip}', [OfficialBusinessTripController::class, 'destroy'])->name('activities.official-business.destroy');
+        Route::post('/official-business/{officialBusinessTrip}/depart', [OfficialBusinessTripController::class, 'depart'])->name('activities.official-business.depart');
+        Route::post('/official-business/{officialBusinessTrip}/return', [OfficialBusinessTripController::class, 'returnTrip'])->name('activities.official-business.return');
+        Route::post('/official-business/{officialBusinessTrip}/ready', [OfficialBusinessTripController::class, 'readyForTravel'])->name('activities.official-business.ready');
+        Route::post('/official-business/{officialBusinessTrip}/for-completion', [OfficialBusinessTripController::class, 'startCompletion'])->name('activities.official-business.for-completion');
+        Route::post('/official-business/{officialBusinessTrip}/cancel', [OfficialBusinessTripController::class, 'cancel'])->name('activities.official-business.cancel');
+        Route::post('/official-business/{officialBusinessTrip}/complete', [OfficialBusinessTripController::class, 'complete'])->name('activities.official-business.complete');
+        Route::get('/official-business/{officialBusinessTrip}/trip-tickets', [OfficialBusinessTripTicketController::class, 'index'])->name('activities.official-business.trip-tickets.index');
+        Route::post('/official-business/{officialBusinessTrip}/trip-tickets', [OfficialBusinessTripTicketController::class, 'store'])->name('activities.official-business.trip-tickets.store');
+        Route::post('/official-business/{officialBusinessTrip}/trip-tickets/sync', [OfficialBusinessTripTicketController::class, 'sync'])->name('activities.official-business.trip-tickets.sync');
+        Route::get('/official-business-trip-tickets/finance-ready', [OfficialBusinessTripTicketController::class, 'financeReady'])->name('activities.official-business.trip-tickets.finance-ready');
+        Route::get('/official-business-trip-tickets/{officialBusinessTripTicket}', [OfficialBusinessTripTicketController::class, 'show'])->name('activities.official-business.trip-tickets.show');
+    Route::put('/official-business-trip-tickets/{officialBusinessTripTicket}', [OfficialBusinessTripTicketController::class, 'update'])->name('activities.official-business.trip-tickets.update');
+    Route::delete('/official-business-trip-tickets/{officialBusinessTripTicket}', [OfficialBusinessTripTicketController::class, 'destroy'])->name('activities.official-business.trip-tickets.destroy');
+    Route::post('/official-business-trip-tickets/{officialBusinessTripTicket}/evidence', [OfficialBusinessTripTicketController::class, 'storeEvidence'])->name('activities.official-business.trip-tickets.evidence.store');
+    Route::delete('/official-business-trip-tickets/{officialBusinessTripTicket}/evidence/{attachment}', [OfficialBusinessTripTicketController::class, 'destroyEvidence'])->name('activities.official-business.trip-tickets.evidence.destroy');
+    Route::put('/official-business-trip-tickets/{officialBusinessTripTicket}/financial-treatment', [OfficialBusinessTripTicketController::class, 'updateFinancialTreatment'])->name('activities.official-business.trip-tickets.financial-treatment.update');
+    Route::post('/official-business-trip-tickets/{officialBusinessTripTicket}/costs', [OfficialBusinessTripTicketController::class, 'storeCost'])->name('activities.official-business.trip-tickets.costs.store');
+    Route::put('/official-business-trip-tickets/{officialBusinessTripTicket}/costs/{cost}', [OfficialBusinessTripTicketController::class, 'updateCost'])->name('activities.official-business.trip-tickets.costs.update');
+    Route::delete('/official-business-trip-tickets/{officialBusinessTripTicket}/costs/{cost}', [OfficialBusinessTripTicketController::class, 'destroyCost'])->name('activities.official-business.trip-tickets.costs.destroy');
+    Route::get('/official-business-trip-tickets/{officialBusinessTripTicket}/completion-checklist', [OfficialBusinessTripTicketController::class, 'completionChecklist'])->name('activities.official-business.trip-tickets.completion-checklist');
+    Route::post('/official-business-trip-tickets/{officialBusinessTripTicket}/complete', [OfficialBusinessTripTicketController::class, 'complete'])->name('activities.official-business.trip-tickets.complete');
+    Route::post('/official-business-trip-tickets/{id}/restore', [OfficialBusinessTripTicketController::class, 'restore'])->name('activities.official-business.trip-tickets.restore');
+    Route::get('/official-business/{officialBusinessTrip}/history.pdf', [OfficialBusinessTripController::class, 'downloadHistoryPdf'])->name('activities.official-business.history-pdf');
+    Route::get('/official-business-trip-tickets/{officialBusinessTripTicket}/pdf', [OfficialBusinessTripTicketController::class, 'downloadPdf'])->name('activities.official-business.trip-tickets.pdf');
+    Route::get('/official-business-trip-tickets/{officialBusinessTripTicket}/history.pdf', [OfficialBusinessTripTicketController::class, 'downloadHistoryPdf'])->name('activities.official-business.trip-tickets.history-pdf');
+    Route::get('/companies/{company}/travel-credits', [CompanyTravelCreditController::class, 'show'])->name('activities.official-business.travel-credits.show');
+    Route::post('/companies/{company}/travel-credits/adjustments', [CompanyTravelCreditController::class, 'adjust'])->name('activities.official-business.travel-credits.adjust');
+        Route::post('/tasks', [ActivityController::class, 'storeTask']);
+        Route::get('/tasks/workflow', [TaskWorkflowController::class, 'index']);
+        Route::post('/tasks/outline', [TaskWorkflowController::class, 'outline']);
+        Route::patch('/tasks/reorder', [TaskWorkflowController::class, 'reorder']);
+        Route::patch('/tasks/bulk', [TaskWorkflowController::class, 'bulk']);
+        Route::get('/task-templates', [TaskWorkflowController::class, 'templates']);
+        Route::post('/task-templates/{template}/instantiate', [TaskWorkflowController::class, 'instantiateTemplate']);
+        Route::post('/tasks/{task}/timer/{action}', [TaskWorkflowController::class, 'timer']);
+        Route::post('/tasks/{task}/duplicate', [TaskWorkflowController::class, 'duplicate']);
+        Route::post('/tasks/{task}/save-template', [TaskWorkflowController::class, 'saveTemplate']);
+        Route::post('/events', [ActivityController::class, 'storeEvent']);
+        Route::post('/calls', [ActivityController::class, 'storeCall']);
+        Route::post('/meetings', [ActivityController::class, 'storeMeeting']);
+        Route::get('/email-activities', [\App\Http\Controllers\EmailActivityController::class, 'index']);
+        Route::post('/email-activities/sync', [\App\Http\Controllers\EmailActivityController::class, 'sync']);
+        Route::get('/email-activities/{id}', [\App\Http\Controllers\EmailActivityController::class, 'show']);
+        Route::get('/email-activities/{id}/thread', [\App\Http\Controllers\EmailActivityController::class, 'thread']);
+        Route::post('/email-activities/send', [\App\Http\Controllers\EmailActivityController::class, 'send']);
+        Route::post('/email-activities/{id}/reply', [\App\Http\Controllers\EmailActivityController::class, 'reply']);
+        Route::get('/email-activities/{id}/attachments/{attachmentId}', [\App\Http\Controllers\EmailActivityController::class, 'downloadAttachment']);
+        Route::get('/email-activities/{id}/files/{attachment}', [\App\Http\Controllers\EmailActivityController::class, 'downloadStoredAttachment']);
+        Route::get('/email/gmail/connect', [\App\Http\Controllers\EmailActivityController::class, 'connectGmail']);
+        Route::get('/email/gmail/callback', [\App\Http\Controllers\EmailActivityController::class, 'gmailCallback']);
+        Route::post('/email/gmail/disconnect', [\App\Http\Controllers\EmailActivityController::class, 'disconnectGmail']);
+        Route::get('/meetings/{meeting}/workspace', [\App\Http\Controllers\MeetingWorkspaceController::class, 'show']);
+        Route::put('/meetings/{meeting}/workspace', [\App\Http\Controllers\MeetingWorkspaceController::class, 'update']);
+        Route::post('/meetings/{meeting}/action-items', [\App\Http\Controllers\MeetingWorkspaceController::class, 'storeActionItem']);
+        Route::put('/meetings/{meeting}/action-items/{actionItem}', [\App\Http\Controllers\MeetingWorkspaceController::class, 'updateActionItem']);
+        Route::delete('/meetings/{meeting}/action-items/{actionItem}', [\App\Http\Controllers\MeetingWorkspaceController::class, 'destroyActionItem']);
+        Route::post('/meetings/{meeting}/action-items/{actionItem}/convert-to-task', [\App\Http\Controllers\MeetingWorkspaceController::class, 'convertActionItem']);
 
-    Route::delete('/tasks/{id}', [ActivityController::class, 'destroyTask']);
-    Route::delete('/events/{id}', [ActivityController::class, 'destroyEvent']);
-    Route::delete('/calls/{id}', [ActivityController::class, 'destroyCall']);
-    Route::delete('/meetings/{id}', [ActivityController::class, 'destroyMeeting']);
+        Route::get('/message-conversations', [\App\Http\Controllers\MessageConversationController::class, 'index']);
+        Route::post('/message-conversations', [\App\Http\Controllers\MessageConversationController::class, 'store']);
+        Route::get('/message-conversations/{conversation}', [\App\Http\Controllers\MessageConversationController::class, 'show']);
+        Route::put('/message-conversations/{conversation}', [\App\Http\Controllers\MessageConversationController::class, 'update']);
+        Route::delete('/message-conversations/{conversation}', [\App\Http\Controllers\MessageConversationController::class, 'destroy']);
+        Route::post('/message-conversations/{conversation}/messages', [\App\Http\Controllers\MessageConversationController::class, 'storeMessage']);
 
-    Route::post('/notes', [ActivityController::class, 'storeNote']);
-    Route::put('/notes/{id}', [ActivityController::class, 'updateNote']);
-    Route::delete('/notes/{id}', [ActivityController::class, 'destroyNote']);
-    Route::post('/meetings/{id}/analyze', [ActivityController::class, 'analyzeMeeting']);
-    Route::post('/meetings/{id}/upload-video', [ActivityController::class, 'uploadVideo']);
-    Route::post('/meetings/{id}/upload-transcript', [ActivityController::class, 'uploadTranscript']);
-    Route::post('/meetings/{id}/upload-minutes', [ActivityController::class, 'uploadMinutes']);
-    Route::post('/calls/{id}/upload-audio', [ActivityController::class, 'uploadCallAudio']);
-    Route::delete('/calls/{id}/audio', [ActivityController::class, 'destroyCallAudio']);
+        Route::put('/tasks/{id}', [ActivityController::class, 'updateTask']);
+        Route::put('/events/{id}', [ActivityController::class, 'updateEvent']);
+        Route::put('/calls/{id}', [ActivityController::class, 'updateCall']);
+        Route::put('/meetings/{id}', [ActivityController::class, 'updateMeeting']);
+
+        Route::delete('/tasks/{id}', [ActivityController::class, 'destroyTask']);
+        Route::delete('/events/{id}', [ActivityController::class, 'destroyEvent']);
+        Route::delete('/calls/{id}', [ActivityController::class, 'destroyCall']);
+        Route::delete('/meetings/{id}', [ActivityController::class, 'destroyMeeting']);
+
+        Route::post('/notes', [ActivityController::class, 'storeNote']);
+        Route::put('/notes/{id}', [ActivityController::class, 'updateNote']);
+        Route::delete('/notes/{id}', [ActivityController::class, 'destroyNote']);
+        Route::post('/meetings/{id}/analyze', [ActivityController::class, 'analyzeMeeting']);
+        Route::post('/meetings/{id}/upload-video', [ActivityController::class, 'uploadVideo']);
+        Route::post('/meetings/{id}/upload-transcript', [ActivityController::class, 'uploadTranscript']);
+        Route::post('/meetings/{id}/upload-minutes', [ActivityController::class, 'uploadMinutes']);
+        Route::post('/calls/{id}/upload-audio', [ActivityController::class, 'uploadCallAudio']);
+        Route::delete('/calls/{id}/audio', [ActivityController::class, 'destroyCallAudio']);
+    });
 });
 
 /*
@@ -279,6 +371,15 @@ Route::get('/job-offer/{token}/decline', [RecruitmentController::class, 'decline
 */
 
 Route::middleware(['auth', 'prevent-back-history', \App\Http\Middleware\EnsurePasswordChanged::class])->group(function () {
+    Route::get('/client/official-business/trip-tickets/page', [OfficialBusinessTripTicketController::class, 'clientPage'])
+        ->name('client.official-business.trip-tickets.page');
+    Route::get('/client/official-business/trip-tickets', [OfficialBusinessTripTicketController::class, 'clientIndex'])
+        ->name('client.official-business.trip-tickets.index');
+    Route::get('/client/official-business/trip-tickets/{officialBusinessTripTicket}', [OfficialBusinessTripTicketController::class, 'clientShow'])
+        ->name('client.official-business.trip-tickets.show');
+    Route::get('/client/official-business/trip-tickets/{officialBusinessTripTicket}/pdf', [OfficialBusinessTripTicketController::class, 'downloadPdf'])
+        ->name('client.official-business.trip-tickets.pdf');
+
     /*
     |--------------------------------------------------------------------------
     | ACCOUNT SETTINGS
@@ -625,10 +726,13 @@ Route::middleware(['auth', 'prevent-back-history', \App\Http\Middleware\EnsurePa
     Route::delete('/company/{company}/consultation-notes/{note}', [CompanyConsultationNoteController::class, 'destroy'])->name('company.consultation-notes.destroy');
 
     Route::get('/company/{company}/activities', [CompanyController::class, 'activities'])->name('company.activities');
-    Route::post('/company/{company}/activities', [CompanyActivityController::class, 'store'])->name('company.activities.store');
-    Route::match(['put', 'patch'], '/company/{company}/activities/{activity}', [CompanyActivityController::class, 'update'])->name('company.activities.update');
-    Route::patch('/company/{company}/activities/{activity}/complete', [CompanyActivityController::class, 'complete'])->name('company.activities.complete');
-    Route::delete('/company/{company}/activities/{activity}', [CompanyActivityController::class, 'destroy'])->name('company.activities.destroy');
+    Route::get('/company/{company}/report', [CompanyController::class, 'report'])
+        ->middleware('human-capital.module:access_activities')
+        ->name('company.report');
+
+    Route::get('/company/{company}/report/pdf', [CompanyController::class, 'reportPdf'])
+        ->middleware('human-capital.module:access_activities')
+        ->name('company.report.pdf');
 
     Route::get('/company/{company}/deals', [CompanyDealController::class, 'index'])->name('company.deals');
     Route::post('/company/{company}/deals', [CompanyDealController::class, 'store'])->name('company.deals.store');
@@ -1477,6 +1581,7 @@ Route::middleware(['auth', 'prevent-back-history', \App\Http\Middleware\EnsurePa
             Route::put('/obf/{officialBusinessTrip}', [OfficialBusinessTripController::class, 'update'])->name('obf.update');
             Route::delete('/obf/{officialBusinessTrip}', [OfficialBusinessTripController::class, 'destroy'])->name('obf.destroy');
             Route::post('/obf/{officialBusinessTrip}/approve', [OfficialBusinessTripController::class, 'approve'])->name('obf.approve');
+            Route::post('/obf/{officialBusinessTrip}/revert', [OfficialBusinessTripController::class, 'revert'])->name('obf.revert');
             Route::post('/obf/{officialBusinessTrip}/reject', [OfficialBusinessTripController::class, 'reject'])->name('obf.reject');
         });
 

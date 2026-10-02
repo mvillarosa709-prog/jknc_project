@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-10-02T02:47:16.360Z",
+  "head": "d8f240a78c6abd340262863be2ff4a4376644676",
+  "warning": "Dirty local working tree; hashes identify this snapshot, not a deployable commit or a production delta. Shared imports are a dependency closure and require integration review. No live baseline exists.",
+  "manifest_records": 317,
+  "migrations": 66,
+  "excluded_local_files": 476,
+  "tests": 22,
+  "env_keys": 175,
+  "by_module": {
+    "Activities core": 169,
+    "Company/Contact timelines": 26,
+    "Email/Gmail": 12,
+    "Meetings/Events": 18,
+    "Messages/Messenger": 30,
+    "Official Business": 48,
+    "Reports": 4,
+    "Tasks": 10
+  }
+}
