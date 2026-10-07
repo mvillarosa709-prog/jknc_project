@@ -9,7 +9,7 @@ const preview = fs.readFileSync(`${root}/resources/views/human-capital/partials/
 const script = view.match(/<script>([\s\S]*?)<\/script>/)[1]
     .replace(/@json\([^\n]*\)/g, 'null')
     .replace(/\{\{[\s\S]*?\}\}/g, '/test');
-const context = { console, window: { confirm: () => true, alert: () => {} }, document: {} };
+const context = { console, window: { confirm: () => true, alert: () => {} }, document: {}, fetch: async () => ({ ok: false }), URLSearchParams };
 vm.createContext(context);
 vm.runInContext(script, context);
 
@@ -22,12 +22,20 @@ page.form = {
     ],
 };
 page.companies = [{ id: 1, company_name: 'Client One' }, { id: 2, company_name: 'Client Two' }];
+page.detailDraft = { company_id: 1, engagement_type: 'Project', deal_id: 44, project_id: 55 };
+page.changeEngagementType('Regular');
+assert.equal(page.detailDraft.deal_id, null);
+assert.equal(page.detailDraft.project_id, null);
+page.detailDraft = { company_id: 1, engagement_type: 'Regular', deal_id: 66, project_id: 77 };
+page.changeEngagementType('Project');
+assert.equal(page.detailDraft.deal_id, null);
+assert.equal(page.detailDraft.project_id, null);
 page.clearTransportationForMode(0, 'Air');
 page.form.detail_rows[0].transportation.airline = 'Air Co';
 page.form.detail_rows[0].transportation.flight_number = 'AC-1';
 page.clearTransportationForMode(0, 'Walking');
 assert.equal(page.form.detail_rows[0].transportation.flight_number, '');
-assert.equal(page.transportationDescription({ mode: 'Walking' }), '—');
+assert.equal(page.transportationDescription({ mode: 'Walking' }), '-');
 assert.equal(page.detailTripLabel(page.form.detail_rows[0]), 'Client One / Engagement');
 page.moveDetail(0, 1);
 assert.equal(page.form.detail_rows[0].destination, 'Airport');
@@ -38,8 +46,10 @@ for (const field of [
 ]) {
     assert.ok(form.includes(field), `form renders ${field}`);
 }
-assert.match(form, /Client \/ Trip:/);
-assert.match(form, /Route:/);
+assert.match(form, /Client \/ Trip/);
+assert.match(form, /<label class="label">Route<\/label>/);
+assert.match(form, /label class="label">Related Engagement \*<\/label><select :value="clientEngagementValue\(\)"/);
+assert.match(form, /@change="selectDetailEngagement\(\$event\.target\.value, \$event\.target\.selectedOptions\[0\]\?\.textContent\)"/);
 assert.match(preview, /Expected Arrival/);
 assert.match(preview, /transportationDescription/);
 assert.match(preview, /Attachments/);

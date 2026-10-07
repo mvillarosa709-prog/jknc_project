@@ -282,11 +282,13 @@ class OfficialBusinessTripController extends Controller
             'company_id' => ['required', 'integer', 'exists:companies,id'],
             'type' => ['required', Rule::in(['Regular', 'Project'])],
         ]);
-        $items = Project::query()->where('company_id', $input['company_id'])->get()
-            ->filter(fn (Project $project) => ! $project->isShell()
-                && ! in_array(strtolower((string) $project->status), ['completed', 'cancelled', 'archived', 'rejected'], true)
-                && (str_contains(strtolower((string) $project->engagement_type), 'regular') === ($input['type'] === 'Regular')))
-            ->map(fn (Project $project) => ['id' => $project->id, 'name' => $project->name])->values();
+        $items = app(\App\Services\OfficialBusinessEngagementService::class)
+            ->eligible((int) $input['company_id'], $input['type'])
+            ->map(fn (Project $project): array => [
+                'id' => $project->id,
+                'name' => $project->name,
+                'deal_id' => $input['type'] === 'Regular' ? $project->deal_id : null,
+            ]);
         $company = Company::findOrFail($input['company_id']);
         $credit = app(OfficialBusinessAuthorizationService::class)->canReadFinance(Auth::user())
             ? app(\App\Services\CompanyTravelCreditService::class)->summary($company)['available_units']
@@ -686,10 +688,10 @@ class OfficialBusinessTripController extends Controller
                 'company_id' => $clientCompanyId,
                 'contact_id' => $clientContact?->id,
                 'deal_id' => $isClientTravel
-                    ? ($validated['deal_id'] ?? $officialBusinessTrip->deal_id)
+                    ? (array_key_exists('deal_id', $validated) ? $validated['deal_id'] : $officialBusinessTrip->deal_id)
                     : null,
                 'project_id' => $isClientTravel
-                    ? ($validated['project_id'] ?? $officialBusinessTrip->project_id)
+                    ? (array_key_exists('project_id', $validated) ? $validated['project_id'] : $officialBusinessTrip->project_id)
                     : null,
 
                 'client_type' => $validated['client_type'] ?? null,
@@ -856,10 +858,10 @@ class OfficialBusinessTripController extends Controller
             'company_id' => $clientCompanyId,
             'contact_id' => $clientContact?->id,
             'deal_id' => $isClientTravel
-                ? ($validated['deal_id'] ?? $officialBusinessTrip->deal_id)
+                ? (array_key_exists('deal_id', $validated) ? $validated['deal_id'] : $officialBusinessTrip->deal_id)
                 : null,
             'project_id' => $isClientTravel
-                ? ($validated['project_id'] ?? $officialBusinessTrip->project_id)
+                ? (array_key_exists('project_id', $validated) ? $validated['project_id'] : $officialBusinessTrip->project_id)
                 : null,
             'duration_minutes' => $officialBusinessTrip->duration_minutes,
             'client_type' => $validated['client_type'] ?? null,
@@ -1872,10 +1874,10 @@ class OfficialBusinessTripController extends Controller
             'ob_reference_no' => $trip->ob_reference_no,
             'classification' => $trip->classification,
             'detail_rows' => Schema::hasTable('official_business_trip_details')
-                ? $trip->details()->with(['project', 'travelDetail', 'transportationDetail'])->orderBy('sort_order')->orderBy('id')->get()
+                ? $trip->details()->with(['deal', 'project', 'travelDetail', 'transportationDetail'])->orderBy('sort_order')->orderBy('id')->get()
                     ->map(function ($detail): array {
                         $row = $detail->toArray();
-                        unset($row['project'], $row['travel_detail'], $row['transportation_detail']);
+                        unset($row['deal'], $row['project'], $row['travel_detail'], $row['transportation_detail']);
                         $travel = $detail->travelDetail;
                         $row['travel'] = $travel ? [
                             'departure_date' => $travel->getRawOriginal('departure_date'),
@@ -1889,7 +1891,14 @@ class OfficialBusinessTripController extends Controller
                             'transport_type', 'rental_provider', 'airline', 'flight_number',
                             'shipping_line', 'vessel_trip', 'other_details',
                         ]) ?? [];
-                        $row['engagement_name'] = $detail->project?->name;
+                        if ($detail->engagement_type === 'Regular' && ! $detail->project_id && $detail->deal_id) {
+                            $workspace = app(\App\Services\OfficialBusinessEngagementService::class)
+                                ->legacyRegular((int) $detail->company_id, (int) $detail->deal_id);
+                            $row['project_id'] = $workspace?->id;
+                            $row['engagement_name'] = $workspace?->name ?: $detail->deal?->deal_name;
+                        } else {
+                            $row['engagement_name'] = $detail->project?->name;
+                        }
                         $company = $detail->company_id && app(OfficialBusinessAuthorizationService::class)->canReadFinance(Auth::user())
                             ? Company::find($detail->company_id) : null;
                         $row['travel_credit_balance'] = $company && Schema::hasTable('company_travel_credit_accounts')

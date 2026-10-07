@@ -37,6 +37,7 @@ beforeEach(function () {
         $table->timestamps();
     });
 
+
     Schema::create('notifications', function (Blueprint $table): void {
         $table->uuid('id')->primary();
         $table->string('type');
@@ -740,7 +741,8 @@ test('classified draft saves and reopens stable master rows and team snapshots',
     ]);
     $company = Company::create(['company_name' => 'Phase Two Client']);
     $departmentId = DB::table('departments')->insertGetId(['department_name' => 'Operations']);
-    $projectId = DB::table('projects')->insertGetId(['company_id' => $company->id, 'name' => 'Monthly Retainer', 'engagement_type' => 'Regular', 'status' => 'In Progress']);
+    $dealId = DB::table('deals')->insertGetId(['deal_name' => 'Monthly Retainer', 'created_at' => now(), 'updated_at' => now()]);
+    $projectId = DB::table('projects')->insertGetId(['company_id' => $company->id, 'deal_id' => null, 'name' => 'Monthly Retainer', 'engagement_type' => 'Regular', 'status' => 'In Progress']);
     $row = ['from_location' => 'JK&C Office', 'destination' => 'Client Office', 'purpose' => 'Review'];
     if ($classification === 'client') $row += ['company_id' => $company->id, 'engagement_type' => 'Regular', 'project_id' => $projectId];
     if ($classification === 'internal') $row += ['internal_activity_type' => 'Internal Meeting', 'department_id' => $departmentId];
@@ -791,6 +793,13 @@ test('classified draft saves and reopens stable master rows and team snapshots',
         ->and(DB::table('official_business_trip_detail_transportation')->count())->toBe(2);
     $page = $this->actingAs($this->manager)->get(route('human-capital.obf'))->assertOk();
     $reloaded = collect($page->viewData('trips'))->firstWhere('id', $trip->id);
+    if ($classification === 'client') {
+        expect($reloaded['detail_rows'][0]['project_id'])->toBe($projectId)
+            ->and($reloaded['detail_rows'][0]['deal_id'])->toBeNull()
+            ->and($reloaded['detail_rows'][0]['engagement_name'])->toBe('Monthly Retainer')
+            ->and($trip->fresh()->project_id)->toBe($projectId)
+            ->and($trip->fresh()->deal_id)->toBeNull();
+    }
     expect($reloaded['detail_rows'][0]['travel']['departure_date'])->toBe('2026-10-08')
         ->and($reloaded['detail_rows'][0]['transportation']['mode'])->toBe('Air')
         ->and($reloaded['detail_rows'][0]['transportation']['flight_number'])->toBe('SA-8');

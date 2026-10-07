@@ -907,14 +907,6 @@
             <!-- Header Actions -->
             <div class="flex flex-wrap items-center justify-end gap-2">
 
-                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; currentPage = 1"
-                    class="h-9 px-4 rounded-lg border border-blue-200 bg-blue-50 text-xs font-semibold text-[#1d54e2] hover:bg-blue-100 transition"
-                >
-                    <i class="fas fa-arrow-left mr-1.5 text-[10px]"></i>
-                    Back to All Activities
-                </button>
 
                 <button
                     type="button"
@@ -2100,25 +2092,9 @@
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center justify-end gap-2">                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                    class="inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                    <i class="fas fa-arrow-left text-[10px]"></i>
-                    Back to All Activities
-                </button>
+            <div class="flex flex-wrap items-center justify-end gap-2">
 
 
-
-                            <button
-                type="button"
-                @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                class="calls-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-                <i class="fas fa-arrow-left text-[10px]"></i>
-                Back to All Activities
-            </button>
 <button
                     type="button"
                     @click="showExportModal = true"
@@ -2552,14 +2528,6 @@
 
         <div class="flex flex-wrap items-center justify-end gap-2">
 
-                        <button
-                type="button"
-                @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                class="calls-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-                <i class="fas fa-arrow-left text-[10px]"></i>
-                Back to All Activities
-            </button>
 <button
                 type="button"
                 @click="showExportModal = true"
@@ -2997,14 +2965,6 @@
 
             <div class="flex flex-wrap items-center justify-end gap-2">
 
-                                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                    class="emails-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                    <i class="fas fa-arrow-left text-[10px]"></i>
-                    Back to All Activities
-                </button>
                 <div class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700">
                     <span x-text="emailMailboxConnection ? ('Gmail: ' + emailMailboxConnection.email_address + ' (' + emailMailboxConnection.connection_status + ')') : 'Gmail: Not Connected'"></span>
                     <span x-show="emailMailboxConnection" class="text-slate-500" x-text="emailMailboxConnection ? (emailMailboxConnection.initial_sync_status === 'capped' ? 'Initial history incomplete; continuing next sync' : (emailMailboxConnection.sync_status === 'continuing' ? 'Sync continuing next run' : (emailMailboxConnection.initial_sync_status === 'complete' ? 'Configured history window imported' : 'History import pending'))) : ''"></span>
@@ -3320,14 +3280,6 @@
 
             <div class="flex flex-wrap items-center justify-end gap-2">
 
-                                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                    class="messages-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                    <i class="fas fa-arrow-left text-[10px]"></i>
-                    Back to All Activities
-                </button>
 <button
                     type="button"
                     class="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 transition hover:border-blue-300 hover:text-[#1d54e2] focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -3816,14 +3768,6 @@
 
             <div class="flex flex-wrap items-center justify-end gap-2">
 
-                                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                    class="official-business-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                    <i class="fas fa-arrow-left text-[10px]"></i>
-                    Back to All Activities
-                </button>
 <button
                     type="button"
                     @click="showExportModal = true" class="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 transition hover:border-blue-300 hover:text-[#1d54e2] focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -4178,14 +4122,6 @@
 
             <div class="flex flex-wrap items-center justify-end gap-2">
 
-                                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                    class="my-ob-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                    <i class="fas fa-arrow-left text-[10px]"></i>
-                    Back to All Activities
-                </button>
 <button
                     type="button"
                     @click="showExportModal = true" class="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-xs font-semibold text-gray-700 transition hover:border-blue-300 hover:text-[#1d54e2] focus:outline-none focus:ring-2 focus:ring-blue-100"
@@ -4570,16 +4506,6 @@
             <p class="mt-1 text-xs text-gray-500">
                 Movement control only &mdash; record when an approved traveler departs and when the traveler returns.
             </p>
-                    <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                    class="travel-desk-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                    <i class="fas fa-arrow-left text-[10px]"></i>
-                    Back to All Activities
-                </button>
-            </div>
 </div>
 
 
@@ -6257,14 +6183,6 @@
             </div>
 
             <div class="flex flex-wrap items-center justify-end gap-2">
-                                <button
-                    type="button"
-                    @click="activeTab = 'all'; selectedTaskDetails = null; selectedMeetingDetails = null; showVideoPlayer = false"
-                    class="meetings-ui-back-button inline-flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-xs font-semibold text-[#1d54e2] transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                    <i class="fas fa-arrow-left text-[10px]"></i>
-                    Back to All Activities
-                </button>
 <button
                     type="button"
                     @click="showExportModal = true"

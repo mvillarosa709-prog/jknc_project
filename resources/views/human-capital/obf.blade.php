@@ -201,9 +201,9 @@
                 <button type="button" @click="closePanel()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
             </div>
 
-            <div class="flex-1 min-h-0 grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[58%_42%] gap-0 bg-gray-50">
+            <div class="obv3-create-layout flex-1 min-h-0 grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[58%_42%] gap-0 bg-gray-50">
                 {{-- LEFT LIVE PREVIEW --}}
-                <div class="min-h-0 flex flex-col border-r bg-gray-100">
+                <div class="obv3-create-preview-panel min-h-0 flex flex-col border-r bg-gray-100">
                     <div class="shrink-0 flex items-center justify-between border-b border-gray-200 bg-gray-100 px-5 py-4">
                         <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">Live Preview</p>
                         <button type="button" onclick="window.print()" class="px-3 py-2 border rounded-lg text-xs font-semibold text-gray-700 bg-white">
@@ -213,23 +213,22 @@
 
                     {{-- A4 PAPER PREVIEW --}}
                     <div class="flex-1 min-h-0 overflow-auto p-5">
-                    <div class="obf-paper print-area">
-                        <div class="obf-letterhead">
-                            <img src="{{ $companyHeader['logo_url'] }}" onerror="this.style.display='none';" class="obf-logo" alt="Company Logo">
-                            <p class="obf-company-name">{{ $companyHeader['company_name'] }}</p>
-                            <p>{{ $companyHeader['company_address'] }}</p>
+                    <div class="obf-paper print-area" :class="{'obv3-preview-paper': Boolean(form.classification)}">
+                        <div class="obf-letterhead obv3-preview-letterhead">
+                            <div class="obv3-preview-brand">John Kelly<br><span>&amp;</span> Company</div>
+                            <p class="obv3-preview-company"><strong>JK&amp;C INC.</strong><br>{{ $companyHeader['company_address'] }}</p>
+                        </div>
+                        <div class="obv3-preview-rule"></div>
+
+                        <div class="obf-title obv3-preview-title">OFFICIAL BUSINESS TRAVEL FORM</div>
+
+                        <div class="obf-reference obv3-preview-meta">
+                            <div><b>OB Reference No.:</b><strong x-text="form.ob_reference_no || '-' "></strong></div>
+                            <div><b>O.B. Classification:</b><strong x-text="classificationLabel()"></strong></div>
+                            <div><b>Date &amp; Time:</b><strong>{{ now()->format('M j, Y g:i A') }}</strong></div>
                         </div>
 
-                        <div class="obf-title">
-                            Official Business Travel Form
-                        </div>
-
-                        <div class="obf-reference">
-                            <div><b>OB Reference No.:</b><strong x-text="form.ob_reference_no || '-'"></strong></div>
-                            <div><b>Date & Time:</b><strong>{{ now()->format('n/j/Y h:i:s A') }}</strong></div>
-                        </div>
-
-                        <div x-show="form.classification" x-cloak>
+                        <div class="obv3-preview-content" x-show="form.classification" x-cloak>
                             @include('human-capital.partials.obf-create-preview')
                         </div>
                         <div x-show="!form.classification" x-cloak>
@@ -1112,7 +1111,7 @@
                 </div>
 
                 {{-- RIGHT FILL-UP FORM --}}
-                <div class="min-h-0 overflow-y-auto bg-white">
+                <div class="obv3-create-form-panel min-h-0 overflow-y-auto bg-white">
                     <div class="sticky top-0 z-20 bg-blue-700 text-white px-5 py-4">
                         <p class="text-xs font-bold uppercase tracking-widest">Fill Up Form</p>
                     </div>
@@ -1121,7 +1120,7 @@
                         method="POST"
                         enctype="multipart/form-data"
                         :action="isEdit ? `{{ url('/human-capital/obf') }}/${form.id}` : `{{ url('/human-capital/obf') }}`"
-                        class="p-5 space-y-6"
+                        class="obv3-create-form-body p-5 space-y-3"
                         @input="dirty = true"
                         @change="dirty = true"
                         @submit="dirty = false"
@@ -1132,7 +1131,7 @@
                         <input type="hidden" name="classification" :value="form.classification || ''">
                         <input type="hidden" name="employee_id" :value="form.classification ? (form.employee_id || '') : ''" :disabled="!form.classification">
                         <input type="hidden" name="nature_of_travel" :value="form.classification ? (form.nature_of_travel || '') : ''" :disabled="!form.classification">
-                        <input type="hidden" name="details_json" :value="JSON.stringify(form.detail_rows || [])" :disabled="!form.classification">
+                        <input type="hidden" name="details_json" :value="JSON.stringify(serializedDetailRows())" :disabled="!form.classification">
                         <input type="hidden" name="attachment_rows_json" :value="JSON.stringify(form.classification ? form.create_attachments || [] : [])" :disabled="!form.classification">
                         <input type="hidden" name="team_natures_json" :value="JSON.stringify(teamNatures())" :disabled="!form.classification">
                         <input type="hidden" name="classification_change_confirmed" :value="form.classification_change_confirmed ? '1' : '0'" :disabled="!form.classification">
@@ -1900,7 +1899,7 @@
                             <textarea name="remarks" x-model="form.remarks" :readonly="isView" rows="4" class="input"></textarea>
                         </section>
 
-                        <div class="sticky bottom-0 bg-white border-t py-4 flex justify-end gap-3">
+                        <div class="obv3-footer-actions sticky bottom-0 bg-white border-t py-3 px-4 flex justify-end gap-3">
                             <button type="button" @click="closePanel()" class="px-5 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                                 Cancel
                             </button>
@@ -2152,6 +2151,7 @@
         padding: 0 !important;
     }
 }
+
 </style>
 
 <script>
@@ -2166,7 +2166,20 @@ function obfPage() {
         departments: @json($obDepartments),
         suggestions: {from: [], destination: [], purpose: []},
         engagements: [],
+        engagementRequestId: 0,
         teamModalOpen: false,
+        teamModalIndex: null,
+        travelModalOpen: false,
+        transportationModalOpen: false,
+        attachmentModalOpen: false,
+        travelModalIndex: null,
+        transportationModalIndex: null,
+        attachmentModalIndex: null,
+        attachmentModalIsNew: false,
+        travelDraft: {},
+        transportationDraft: {},
+        personnelNatureOptions: ['Field Work', 'Client Assistance', 'Operations Support', 'Site Inspection', 'Audit', 'Delivery / Pickup', 'Training / Seminar', 'Other'],
+        transportationModes: ['Company Vehicle', 'Private Vehicle', 'Ride-Hailing', 'Taxi', 'Public Transportation', 'Rental Vehicle', 'Air', 'Sea/Ferry', 'Walking', 'Other'],
         teamDraft: {employee_id: '', nature_of_travel: ''},
         detailModalOpen: false,
         detailModalIndex: null,
@@ -2199,7 +2212,13 @@ function obfPage() {
         classificationLabel(value = this.form.classification) {
             return {client: 'Client O.B.', internal: 'Internal / Company O.B.', social: 'Social / Marketing / Non-Creditable'}[value] || '-';
         },
-        detailSectionTitle() {
+        classificationDescription(value) {
+            return {
+                client: 'Travel performed for a client and may be connected to a Regular Engagement or Project and travel credits.',
+                internal: 'Travel undertaken for JK&C itself; no client or travel-credit relationship.',
+                social: 'External activity, networking, marketing, representation, etc. Not chargeable against client travel credits.',
+            }[value] || '';
+        },        detailSectionTitle() {
             return {client: 'Client Official Business', internal: 'Internal O.B. Details', social: 'Social / Marketing Activity'}[this.form.classification] || 'O.B. Details';
         },
         detailAddLabel() {
@@ -2228,8 +2247,11 @@ function obfPage() {
         addTeamMember() {
             const employee = this.selectedTeamEmployee();
             if (!employee || !this.teamDraft.nature_of_travel || String(employee.id) === String(this.form.employee_id)
-                || (this.form.team_rows || []).some(row => String(row.employee_id) === String(employee.id))) return;
-            this.form.team_rows.push({...employee, employee_id: employee.id, nature_of_travel: this.teamDraft.nature_of_travel});
+                || (this.form.team_rows || []).some((row, index) => index !== this.teamModalIndex && String(row.employee_id) === String(employee.id))) return;
+            const member = {...employee, employee_id: employee.id, nature_of_travel: this.teamDraft.nature_of_travel};
+            if (this.teamModalIndex === null) this.form.team_rows.push(member);
+            else this.form.team_rows[this.teamModalIndex] = member;
+            this.teamModalIndex = null;
             this.teamModalOpen = false;
             this.dirty = true;
         },
@@ -2255,12 +2277,15 @@ function obfPage() {
             return row.from_location || '-';
         },
         detailRelated(row) {
-            if (this.form.classification === 'client') return this.engagements.find(item => String(item.id) === String(row.project_id))?.name || row.engagement_name || (row.project_id ? `#${row.project_id}` : '-');
+            if (this.form.classification === 'client') {
+                const engagementId = row.project_id;
+                return this.engagements.find(item => String(item.id) === String(engagementId))?.name || row.engagement_name || '-';
+            }
             if (this.form.classification === 'internal') return this.departmentName(row.department_id);
             return row.organization_host || '-';
         },
         detailDescription(row) {
-            if (this.form.classification === 'client') return `${row.engagement_type || '-'} / ${this.detailRelated(row)} / Credit: ${row.travel_credit_balance ?? '—'}`;
+            if (this.form.classification === 'client') return `${row.engagement_type || '-'} / ${this.detailRelated(row)} / Credit: ${row.travel_credit_balance ?? '-'}`;
             if (this.form.classification === 'internal') return `${row.internal_activity_type || '-'} / ${this.departmentName(row.department_id)}`;
             return `${row.social_activity_type || '-'} / ${row.organization_host || '-'}`;
         },
@@ -2286,13 +2311,107 @@ function obfPage() {
                 Other: ['other_details'],
             }[transportation.mode] || [];
             const labels = {vehicle:'Vehicle',plate_number:'Plate',driver:'Driver',owner_driver:'Owner / Driver',provider:'Provider',transport_type:'Type',rental_provider:'Rental Provider',airline:'Airline',flight_number:'Flight',shipping_line:'Shipping Line',vessel_trip:'Vessel / Trip',other_details:'Details'};
-            return fields.map(field => transportation[field] ? `${labels[field]}: ${transportation[field]}` : '').filter(Boolean).join(' · ') || (transportation.mode === 'Walking' ? '—' : '-');
+            return fields.map(field => transportation[field] ? `${labels[field]}: ${transportation[field]}` : '').filter(Boolean).join(' / ') || '-';
         },
         ensureDetailChildren(row) {
             if (!row.client_key && !row.id) row.client_key = this.makeClientKey();
             row.travel = {...(row.travel || {})};
             row.transportation = {...(row.transportation || {})};
             return row;
+        },
+        openTeamMemberModal(index = null) {
+            this.teamModalIndex = index;
+            const member = index === null ? null : this.form.team_rows[index];
+            this.teamDraft = member ? {employee_id: member.employee_id, nature_of_travel: member.nature_of_travel || ''} : {employee_id: '', nature_of_travel: ''};
+            this.teamModalOpen = true;
+        },
+        clientEngagementValue() {
+            return this.normalizeEngagementId(this.detailDraft.project_id) ?? '';
+        },
+        detailRoute(row) {
+            return `${row.from_location || '-'} -> ${row.destination || '-'}`;
+        },
+        formatExpense(value) {
+            return value === null || value === undefined || value === '' ? '-' : `PHP ${Number(value).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        },
+        transportationModeLabel(mode) {
+            return mode === 'Sea/Ferry' ? 'Sea / Ferry' : mode;
+        },
+        travelActionLabel(row) {
+            const travel = row.travel || {};
+            return travel.departure_date && travel.departure_time && travel.expected_arrival_date && travel.expected_arrival_time ? 'Edit' : 'Complete';
+        },
+        openTravelModal(index) {
+            this.travelModalIndex = index;
+            const row = this.ensureDetailChildren(this.form.detail_rows[index]);
+            this.travelDraft = {...row.travel};
+            this.travelModalOpen = true;
+        },
+        get selectedTravelRow() {
+            return this.travelModalIndex === null ? null : this.form.detail_rows[this.travelModalIndex] || null;
+        },
+        saveTravelModal() {
+            const row = this.ensureDetailChildren(this.form.detail_rows[this.travelModalIndex]);
+            row.travel = {...this.travelDraft};
+            this.travelModalOpen = false;
+            this.dirty = true;
+        },
+        openTransportationModal(index) {
+            this.transportationModalIndex = index;
+            const row = this.ensureDetailChildren(this.form.detail_rows[index]);
+            this.transportationDraft = {...row.transportation};
+            this.transportationModalOpen = true;
+        },
+        get selectedTransportationRow() {
+            return this.transportationModalIndex === null ? null : this.form.detail_rows[this.transportationModalIndex] || null;
+        },
+        clearTransportationDraftForMode(mode) {
+            const fields = ['vehicle','plate_number','driver','owner_driver','provider','transport_type','rental_provider','airline','flight_number','shipping_line','vessel_trip','other_details'];
+            fields.forEach(field => this.transportationDraft[field] = '');
+            this.transportationDraft.mode = mode;
+        },
+        saveTransportationModal() {
+            const row = this.ensureDetailChildren(this.form.detail_rows[this.transportationModalIndex]);
+            row.transportation = {...this.transportationDraft};
+            this.transportationModalOpen = false;
+            this.dirty = true;
+        },
+        attachmentTripLabelForKey(key) {
+            const row = (this.form.detail_rows || []).find(item => this.detailReference(item) === key);
+            return row ? this.attachmentTripLabel(row) : 'Unmatched detail';
+        },
+        openCreateAttachment(index) {
+            this.attachmentModalIndex = index;
+            this.attachmentModalIsNew = false;
+            this.attachmentModalOpen = true;
+        },
+        addCreateAttachment() {
+            this.form.create_attachments ||= [];
+            const index = this.form.create_attachments.length;
+            this.form.create_attachments.push({id: null, key: this.makeClientKey(), type: '', detail_key: '', description: '', filename: '', url: '', remove: false});
+            this.attachmentModalIndex = index;
+            this.attachmentModalIsNew = true;
+            this.attachmentModalOpen = true;
+            this.dirty = true;
+        },
+        saveCreateAttachment() {
+            const attachment = this.form.create_attachments[this.attachmentModalIndex];
+            if (!attachment || !attachment.type || (!attachment.id && !attachment.filename)) {
+                window.alert('Select an attachment type and upload a file.');
+                return;
+            }
+            this.attachmentModalOpen = false;
+            this.attachmentModalIndex = null;
+            this.attachmentModalIsNew = false;
+            this.dirty = true;
+        },
+        cancelCreateAttachment() {
+            if (this.attachmentModalIndex !== null && this.attachmentModalIsNew) {
+                this.form.create_attachments.splice(this.attachmentModalIndex, 1);
+            }
+            this.attachmentModalOpen = false;
+            this.attachmentModalIndex = null;
+            this.attachmentModalIsNew = false;
         },
         clearTransportationForMode(index, mode) {
             const row = this.ensureDetailChildren(this.form.detail_rows[index]);
@@ -2308,25 +2427,108 @@ function obfPage() {
             this.dirty = true;
         },
         openDetailModal(index = null) {
+            ++this.engagementRequestId;
             this.detailModalIndex = index;
             this.detailDraft = index === null ? {} : {...this.form.detail_rows[index]};
+            if (this.form.classification === 'client') {
+                if (this.detailDraft.engagement_type === 'Regular') {
+                    this.detailDraft.deal_id = this.normalizeEngagementId(this.detailDraft.deal_id);
+                    this.detailDraft.project_id = this.normalizeEngagementId(this.detailDraft.project_id);
+                } else if (this.detailDraft.engagement_type === 'Project') {
+                    this.detailDraft.deal_id = null;
+                    this.detailDraft.project_id = this.normalizeEngagementId(this.detailDraft.project_id);
+                }
+            }
             this.engagements = [];
             this.detailModalOpen = true;
-            if (this.form.classification === 'client' && this.detailDraft.company_id && this.detailDraft.engagement_type) this.refreshEngagements(true);
+            if (this.form.classification === 'client' && this.detailDraft.company_id && this.detailDraft.engagement_type) {
+                return this.refreshEngagements(true);
+            }
+            return Promise.resolve();
+        },
+        normalizeEngagementId(value) {
+            return value === '' || value === null || value === undefined ? null : value;
         },
         async refreshEngagements(preserveSelection = false) {
-            const selected = preserveSelection ? this.detailDraft.project_id : '';
-            this.detailDraft.project_id = selected;
+            const requestId = ++this.engagementRequestId;
+            const draft = this.detailDraft;
+            const companyId = draft.company_id;
+            const type = draft.engagement_type;
+            const isRegular = type === 'Regular';
+            const selected = preserveSelection
+                ? this.normalizeEngagementId(draft.project_id)
+                : null;
+            const legacyDeal = preserveSelection && isRegular && selected === null
+                ? this.normalizeEngagementId(draft.deal_id) : null;
+            const isCurrent = () => requestId === this.engagementRequestId
+                && draft === this.detailDraft
+                && String(companyId) === String(draft.company_id)
+                && type === draft.engagement_type;
+            draft.deal_id = isRegular ? this.normalizeEngagementId(draft.deal_id) : null;
+            draft.project_id = selected;
             this.engagements = [];
-            this.detailDraft.travel_credit_balance = null;
-            if (!this.detailDraft.company_id || !this.detailDraft.engagement_type) return;
-            const params = new URLSearchParams({company_id: this.detailDraft.company_id, type: this.detailDraft.engagement_type});
-            const response = await fetch(`{{ route('human-capital.obf.engagements') }}?${params}`, {headers: {'Accept': 'application/json'}});
-            if (!response.ok) return;
+            draft.travel_credit_balance = null;
+            if (!companyId || !type) return;
+            const params = new URLSearchParams({company_id: companyId, type});
+            const response = await fetch("{{ route('human-capital.obf.engagements') }}?" + params, {headers: {'Accept': 'application/json'}});
+            if (!isCurrent() || !response.ok) return;
             const data = await response.json();
+            if (!isCurrent()) return;
             this.engagements = data.items || [];
-            this.detailDraft.travel_credit_balance = data.travel_credit_balance;
-            if (!this.engagements.some(item => String(item.id) === String(selected))) this.detailDraft.project_id = '';
+            draft.travel_credit_balance = data.travel_credit_balance;
+            // Alpine must create the fetched option elements before restoring the edit value.
+            if (typeof this.$nextTick === 'function') await this.$nextTick();
+            if (!isCurrent()) return;
+            const legacyMatches = legacyDeal === null ? [] : this.engagements.filter(item => String(item.deal_id) === String(legacyDeal));
+            const selectedEngagement = this.engagements.find(item => String(item.id) === String(selected))
+                || (legacyMatches.length === 1 ? legacyMatches[0] : null);
+            // Keep an unavailable saved relationship visible; save/submit validation explains eligibility.
+            draft.deal_id = isRegular
+                ? (selectedEngagement ? (selectedEngagement.deal_id ?? null) : (draft.deal_id ?? null)) : null;
+            draft.project_id = selectedEngagement?.id ?? selected;
+            draft.engagement_name = selectedEngagement?.name || draft.engagement_name || '';
+        },
+        selectDetailEngagement(value, visibleName = '') {
+            const selected = this.normalizeEngagementId(value);
+            const selectedEngagement = this.engagements.find(item => String(item.id) === String(selected));
+            if (this.detailDraft.engagement_type === 'Regular') {
+                this.detailDraft.deal_id = selectedEngagement?.deal_id ?? null;
+                this.detailDraft.project_id = selected;
+            } else if (this.detailDraft.engagement_type === 'Project') {
+                this.detailDraft.deal_id = null;
+                this.detailDraft.project_id = selected;
+            }
+            this.detailDraft.engagement_name = visibleName.trim() || selectedEngagement?.name || '';
+        },
+        changeDetailClient(companyId = this.detailDraft.company_id) {
+            this.detailDraft.company_id = companyId;
+            this.detailDraft.deal_id = null;
+            this.detailDraft.project_id = null;
+            this.detailDraft.engagement_name = '';
+            this.detailDraft.travel_credit_balance = null;
+            return this.refreshEngagements();
+        },
+        changeEngagementType(type) {
+            this.detailDraft.engagement_type = type;
+            this.detailDraft.deal_id = null;
+            this.detailDraft.project_id = null;
+            this.detailDraft.engagement_name = '';
+            return this.refreshEngagements();
+        },
+        serializedDetailRows() {
+            return (this.form.detail_rows || []).map(source => {
+                const row = {...source};
+                if (this.form.classification === 'client') {
+                    if (row.engagement_type === 'Regular') {
+                        row.deal_id = this.normalizeEngagementId(row.deal_id);
+                        row.project_id = this.normalizeEngagementId(row.project_id);
+                    } else if (row.engagement_type === 'Project') {
+                        row.deal_id = null;
+                        row.project_id = this.normalizeEngagementId(row.project_id);
+                    }
+                }
+                return row;
+            });
         },
         async loadSuggestions(field) {
             const response = await fetch(`{{ route('human-capital.obf.suggestions') }}?field_type=${encodeURIComponent(field)}`, {headers: {'Accept': 'application/json'}});
@@ -2334,7 +2536,18 @@ function obfPage() {
         },
         saveDetail() {
             const row = this.ensureDetailChildren({...this.detailDraft});
-            if (this.form.classification === 'client') row.engagement_name = this.engagements.find(item => String(item.id) === String(row.project_id))?.name || row.engagement_name || '';
+            if (this.form.classification === 'client') {
+                if (row.engagement_type === 'Regular') {
+                    row.deal_id = this.normalizeEngagementId(row.deal_id);
+                    row.project_id = this.normalizeEngagementId(row.project_id);
+                } else if (row.engagement_type === 'Project') {
+                    row.deal_id = null;
+                    row.project_id = this.normalizeEngagementId(row.project_id);
+                }
+                const engagementId = row.project_id;
+                const selectedEngagement = this.engagements.find(item => String(item.id) === String(engagementId));
+                row.engagement_name = selectedEngagement?.name || row.engagement_name || '';
+            }
             if (this.detailModalIndex === null) this.form.detail_rows.push(row);
             else this.form.detail_rows[this.detailModalIndex] = row;
             this.detailModalOpen = false;
@@ -2358,16 +2571,12 @@ function obfPage() {
             return row?.id ? `detail:${row.id}` : (row?.client_key || '');
         },
         attachmentTripLabel(row) {
-            const route = `${row.from_location || '-'} → ${row.destination || '-'}`;
-            if (this.form.classification === 'client') return `${this.clientName(row.company_id)}  ${route}`;
+            const route = `${row.from_location || '-'} -> ${row.destination || '-'}`;
+            if (this.form.classification === 'client') return `${row.engagement_type || '-'} / ${this.detailRelated(row)} / Credit: ${row.travel_credit_balance ?? '-'}`;
             if (this.form.classification === 'internal') return `Internal  ${route}`;
             return `${row.activity_event_name || 'Activity / Event'}  ${route}`;
         },
-        addCreateAttachment() {
-            this.form.create_attachments ||= [];
-            this.form.create_attachments.push({id: null, key: this.makeClientKey(), type: '', detail_key: '', description: '', filename: '', url: '', remove: false});
-            this.dirty = true;
-        },
+
         setCreateAttachmentFile(index, event) {
             const file = event.target.files?.[0];
             if (file && this.form.create_attachments[index]) this.form.create_attachments[index].filename = file.name;
@@ -2907,8 +3116,6 @@ function obfPage() {
                 'undefined',
                 '0',
                 '0.00',
-                'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±0',
-                'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±0.00'
             ].includes(normalized.toLowerCase());
         },
 
@@ -3222,6 +3429,7 @@ function obfPage() {
         display: none !important;
     }
 }
+
 </style>
 
 {{-- OBF-PUBLIC-TRANSPORT-PRINT-GRID --}}
@@ -3238,6 +3446,7 @@ function obfPage() {
         max-width: 100% !important;
     }
 }
+
 </style>
 
 {{-- OBF-COMPANY-VEHICLE-5050 --}}
@@ -3302,6 +3511,7 @@ function obfPage() {
             max-width: 50% !important;
         }
     }
+
 </style>
 
 {{-- OBF-COMPANY-PREVIEW-FIXED-BOX --}}
@@ -3356,6 +3566,7 @@ function obfPage() {
             max-width: 100% !important;
         }
     }
+
 </style>
 
 {{-- OBF-TRANSPORT-MIRROR-V1 --}}
@@ -3469,4 +3680,277 @@ function obfPage() {
         }
     }
 
+.obf-paper.obv3-preview-paper {
+    width: 760px; max-width: 100%; min-height: 930px; padding: 30px 34px;
+    border-left: 0; box-shadow: 0 4px 18px rgb(15 23 42 / 0.10);
+    color: #1f2937; font-family: Arial, Helvetica, sans-serif; font-size: 11px; line-height: 1.35;
+}
+.obv3-preview-letterhead { border: 0; margin: 0; padding: 0; color: #0b1b3f; text-align: center; }
+.obv3-preview-brand { margin-top: 4px; color: #111827; font-family: Georgia, 'Times New Roman', serif; font-size: 34px; line-height: 0.9; }
+.obv3-preview-brand span { color: #2860e3; }
+.obv3-preview-company { margin: 8px 0 0 !important; color: #111827; font-size: 11px; line-height: 1.4; }
+.obv3-preview-rule { height: 4px; margin: 22px 0; background: #2860e3; }
+.obv3-preview-title { margin: 0; padding: 10px 14px; border-radius: 7px; background: #2860e3; font-size: 15px; letter-spacing: 0.05em; }
+.obf-reference.obv3-preview-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0 10px; font-size: 11px; }
+.obv3-preview-meta > div { min-width: 0; }
+.obv3-preview-meta b { display: block; min-width: 0; color: #1f2937; font-size: 11px; }
+.obv3-preview-meta strong { display: block; margin-top: 2px; color: #111827; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.obv3-preview-content .section-title { margin: 15px 0 6px; padding: 7px 10px; border-radius: 5px; background: #214893; color: #fff; font-size: 11px; line-height: 1.2; letter-spacing: 0.05em; }
+.obv3-preview-content .preview-table { width: 100%; margin: 0; border-collapse: collapse; border-spacing: 0; table-layout: auto; }
+.obv3-preview-content .preview-table th, .obv3-preview-content .preview-table td { padding: 6px; border: 1px solid #d5d9e0; color: #1f2937; font-size: 10px; line-height: 1.25; vertical-align: top; overflow-wrap: anywhere; }
+.obv3-preview-content .preview-table th { background: #f0f3f7; font-weight: 700; }
+@media print {
+    .obf-paper.obv3-preview-paper { width: 100% !important; max-width: none !important; min-height: 0 !important; padding: 30px 34px !important; border: 0 !important; box-shadow: none !important; }
+    .obf-reference.obv3-preview-meta { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 12px !important; margin: 14px 0 10px !important; }
+    .obv3-preview-meta b { display: block !important; min-width: 0 !important; }
+    .obv3-preview-meta strong { display: block !important; font-size: 11px !important; }
+    .obv3-preview-content .section-title { margin: 15px 0 6px !important; padding: 7px 10px !important; font-size: 11px !important; }
+    .obv3-preview-content .preview-table { border-collapse: collapse !important; border-spacing: 0 !important; }
+    .obv3-preview-content .preview-table th, .obv3-preview-content .preview-table td { padding: 6px !important; font-size: 10px !important; }
+}
+.obv3-create-layout { min-width: 0; }
+.obv3-create-form-panel, .obv3-create-preview-panel { min-width: 0; }
+.obv3-create-form-body { padding-bottom: 1rem; }
+.obv3-section { padding: 0.8rem; border-radius: 0.75rem; }
+.obv3-section .form-title { margin-bottom: 0.65rem; }
+.obv3-data-table { min-width: 720px; }
+.obv3-data-table th { white-space: nowrap; }
+.obv3-modal-backdrop { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; background: rgb(17 24 39 / 0.48); padding: 1rem; }
+.obv3-modal { width: min(720px, 96vw); max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; border-radius: 1rem; background: white; box-shadow: 0 24px 80px rgb(0 0 0 / 0.22); }
+.obv3-modal-head { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid rgb(229 231 235); padding: 0.9rem 1.1rem; }
+.obv3-modal-head .form-title { flex: 1; margin: 0; }
+.obv3-modal-body { min-height: 0; overflow-y: auto; padding: 1rem 1.1rem; }
+.obv3-modal-foot { display: flex; flex: none; justify-content: flex-end; gap: 0.6rem; border-top: 1px solid rgb(229 231 235); padding: 0.75rem 1.1rem; }
+.obv3-footer-actions { z-index: 25; padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+@media (max-width: 1150px) {
+    .obv3-create-layout { display: flex; flex-direction: column; overflow-y: auto; }
+    .obv3-create-form-panel { order: 1; flex: none; min-height: 75vh; overflow: visible; }
+    .obv3-create-preview-panel { order: 2; flex: none; min-height: 75vh; border-right: 0; border-top: 1px solid rgb(229 231 235); }
+    .obv3-create-form-body { padding: 0.75rem; }
+}
+@media (max-width: 700px) {
+    .obv3-classification { grid-template-columns: 1fr; }
+    .obv3-modal-grid { grid-template-columns: 1fr; }
+    .obv3-modal-grid .col-span-2 { grid-column: auto; }
+    .obv3-modal-backdrop { padding: 0.5rem; }
+    .obv3-modal { width: 100%; max-height: 94vh; }
+    .obv3-footer-actions { justify-content: stretch; gap: 0.4rem; }
+    .obv3-footer-actions > * { flex: 1; }
+    .obv3-footer-actions button { padding-left: 0.5rem; padding-right: 0.5rem; }
+}
+
+
+
+/* O.B. V3 classification info tooltip */
+.obv3-classification > div {
+    min-width: 0;
+    position: relative;
+}
+
+.obv3-classification-choice {
+    min-height: 2.35rem;
+    white-space: normal;
+}
+
+.obv3-classification-info {
+    position: absolute;
+    top: 50%;
+    right: 0.55rem;
+    transform: translateY(-50%);
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background: #facc15;
+    color: #713f12;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1.15rem;
+    text-align: center;
+    cursor: help;
+    z-index: 60;
+    box-shadow: 0 0 0 1px rgba(161, 98, 7, 0.16);
+}
+
+.obv3-classification-info:hover,
+.obv3-classification-info:focus {
+    background: #eab308;
+    outline: none;
+}
+
+.obv3-classification-tooltip {
+    position: absolute;
+
+    /* Show above the classification button */
+    bottom: calc(100% + 0.5rem);
+    top: auto;
+
+    width: 15.5rem;
+    max-width: calc(100vw - 2rem);
+
+    padding: 0.6rem 0.7rem;
+    border-radius: 0.5rem;
+
+    background: #1f2937;
+    color: #ffffff;
+
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.4;
+    text-align: left;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+
+    z-index: 999;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.22);
+}
+
+/* First classification: keep tooltip inside left edge */
+.obv3-classification > div:first-child .obv3-classification-tooltip {
+    left: 0;
+    right: auto;
+    transform: translateY(0.2rem);
+}
+
+/* Middle classification: center tooltip */
+.obv3-classification > div:nth-child(2) .obv3-classification-tooltip {
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, 0.2rem);
+}
+
+/* Last classification: keep tooltip inside right edge */
+.obv3-classification > div:last-child .obv3-classification-tooltip {
+    right: 0;
+    left: auto;
+    transform: translateY(0.2rem);
+}
+
+.obv3-classification > div:first-child .obv3-classification-tooltip.show,
+.obv3-classification > div:last-child .obv3-classification-tooltip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.obv3-classification > div:nth-child(2) .obv3-classification-tooltip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
+@media (max-width: 700px) {
+    .obv3-classification {
+        grid-template-columns: 1fr;
+    }
+
+    .obv3-classification-tooltip,
+    .obv3-classification > div:first-child .obv3-classification-tooltip,
+    .obv3-classification > div:nth-child(2) .obv3-classification-tooltip,
+    .obv3-classification > div:last-child .obv3-classification-tooltip {
+        left: 0;
+        right: auto;
+        width: min(17rem, calc(100vw - 3rem));
+    }
+
+    .obv3-classification > div:nth-child(2) .obv3-classification-tooltip {
+        transform: translateY(0.2rem);
+    }
+
+    .obv3-classification > div:nth-child(2) .obv3-classification-tooltip.show {
+        transform: translateY(0);
+    }
+}
+
+/* Ensure all three O.B. classification info icons remain visible */
+.obv3-classification > div {
+    position: relative;
+}
+
+.obv3-classification-info {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: absolute !important;
+    top: 50% !important;
+    right: 0.55rem !important;
+    left: auto !important;
+    transform: translateY(-50%) !important;
+    width: 1.15rem !important;
+    height: 1.15rem !important;
+    min-width: 1.15rem !important;
+    min-height: 1.15rem !important;
+    padding: 0 !important;
+    background: #facc15 !important;
+    color: #713f12 !important;
+    border-radius: 9999px !important;
+    font-size: 0.72rem !important;
+    font-weight: 800 !important;
+    line-height: 1.15rem !important;
+    text-align: center !important;
+    z-index: 80 !important;
+}
+
+/* Keep button text away from yellow info icon */
+.obv3-classification-choice {
+    padding-right: 2rem !important;
+}
+
+/* O.B. V3 explicit classification tooltip positioning */
+.obv3-classification-tooltip.obv3-tooltip-left {
+    left: 0 !important;
+    right: auto !important;
+    transform: translateY(0.2rem) !important;
+}
+
+.obv3-classification-tooltip.obv3-tooltip-center {
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, 0.2rem) !important;
+}
+
+.obv3-classification-tooltip.obv3-tooltip-right {
+    left: auto !important;
+    right: 0 !important;
+    transform: translateY(0.2rem) !important;
+}
+
+.obv3-classification-tooltip.obv3-tooltip-left.show {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) !important;
+}
+
+.obv3-classification-tooltip.obv3-tooltip-center.show {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translate(-50%, 0) !important;
+}
+
+.obv3-classification-tooltip.obv3-tooltip-right.show {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateY(0) !important;
+}
+
+@media (max-width: 700px) {
+    .obv3-classification-tooltip.obv3-tooltip-left,
+    .obv3-classification-tooltip.obv3-tooltip-center,
+    .obv3-classification-tooltip.obv3-tooltip-right {
+        left: 0 !important;
+        right: auto !important;
+        transform: translateY(0.2rem) !important;
+    }
+
+    .obv3-classification-tooltip.obv3-tooltip-left.show,
+    .obv3-classification-tooltip.obv3-tooltip-center.show,
+    .obv3-classification-tooltip.obv3-tooltip-right.show {
+        transform: translateY(0) !important;
+    }
+}
 </style>

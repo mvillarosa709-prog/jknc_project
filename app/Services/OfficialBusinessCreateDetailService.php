@@ -51,7 +51,8 @@ class OfficialBusinessCreateDetailService
             $rules += [
                 'rows.*.company_id' => [$isDraft ? 'nullable' : 'required', 'integer', 'exists:companies,id'],
                 'rows.*.engagement_type' => [$isDraft ? 'nullable' : 'required', Rule::in(['Regular', 'Project'])],
-                'rows.*.project_id' => [$isDraft ? 'nullable' : 'required', 'integer', 'exists:projects,id'],
+                'rows.*.deal_id' => ['nullable', 'integer', 'min:1'],
+                'rows.*.project_id' => ['nullable', 'integer', 'min:1'],
             ];
         } elseif ($classification === OfficialBusinessTrip::CLASSIFICATION_INTERNAL) {
             $rules += [
@@ -103,18 +104,36 @@ class OfficialBusinessCreateDetailService
                 }
             }
 
-            if ($classification !== OfficialBusinessTrip::CLASSIFICATION_CLIENT || ! filled($row['project_id'] ?? null)) {
+            if ($classification !== OfficialBusinessTrip::CLASSIFICATION_CLIENT) {
                 continue;
             }
-            $project = Project::query()->whereKey($row['project_id'])->first();
-            if (! $project || (int) $project->company_id !== (int) ($row['company_id'] ?? 0)
-                || $project->isShell()
-                || in_array(strtolower((string) $project->status), ['completed', 'cancelled', 'archived', 'rejected'], true)
-                || (str_contains(strtolower((string) $project->engagement_type), 'regular') !== (($row['engagement_type'] ?? null) === 'Regular'))) {
-                $errors["rows.{$index}.project_id"] = 'Select an active engagement belonging to this client and type.';
+
+            $engagementType = $row['engagement_type'] ?? null;
+            $companyId = (int) ($row['company_id'] ?? 0);
+            $engagements = app(OfficialBusinessEngagementService::class);
+            $projectId = $row['project_id'] ?? null;
+            $legacyDealId = $engagementType === 'Regular' ? ($row['deal_id'] ?? null) : null;
+            $label = $engagementType === 'Regular' ? 'Related Regular Engagement' : 'Related Project';
+            if (! filled($projectId) && ! filled($legacyDealId)) {
+                $row['project_id'] = null;
+                $row['deal_id'] = null;
+                if (! $isDraft) {
+                    $errors['details_json'][] = 'O.B. Detail '.($index + 1).' '.$label.' is required.';
+                }
                 continue;
             }
-            $row['deal_id'] = $project->deal_id;
+
+            $project = filled($projectId)
+                ? Project::query()->whereKey((int) $projectId)->first()
+                : $engagements->legacyRegular($companyId, (int) $legacyDealId);
+            if (! $project || (int) $project->company_id !== $companyId
+                || ! $engagements->isEligible($project, (string) $engagementType)) {
+                $errors['details_json'][] = 'O.B. Detail '.($index + 1).' '.$label.' must be active and belong to this client.';
+                continue;
+            }
+            $row['project_id'] = $project->id;
+            // Derive the Deal from the selected Regular workspace; never trust a submitted Deal ID.
+            $row['deal_id'] = $engagementType === 'Regular' ? $project->deal_id : null;
         }
         unset($row);
 

@@ -38,12 +38,7 @@ assert.match(calendar, /src="https:\/\/calendar\.google\.com\/calendar\/embed\?s
 for (const view of ['list', 'board', 'calendar']) assert.match(source, new RegExp(`@click="taskView = '${view}'"`));
 assert.match(source, /taskView: 'list'/);
 
-const backButtons = [...source.matchAll(/<button\b[\s\S]*?<\/button>/g)].map(match => match[0]).filter(button => button.includes('Back to All Activities'));
-assert.ok(backButtons.length >= 10);
-for (const button of backButtons) {
-    const click = button.match(/@click="([^"]+)"/)[1];
-    const state = { activeTab: 'task', selectedTaskDetails: {}, selectedMeetingDetails: {}, currentPage: 2, showVideoPlayer: true };
-    new Function('state', `with (state) { ${click} }`)(state);
-    assert.equal(state.activeTab, 'all');
-}
-console.log('PASS: All Activities has no submenu/calendar state, parent/back/default open the landing area, and Tasks retains List/Board/Calendar and the original Google Calendar embed.');
+assert.doesNotMatch(source, /Back\s+to\s+All\s+Activities/i);
+assert.doesNotMatch(source, /(?:calls|emails|messages|official-business|my-ob|travel-desk|meetings)-ui-back-button/);
+assert.doesNotMatch(source, /<div class="flex shrink-0 flex-wrap items-center justify-end gap-2">\s*<\/div>/);
+console.log('PASS: Activities headers have no Back to All Activities control or empty Travel Desk action container; parent/default navigation and Tasks List/Board/Calendar remain.');
