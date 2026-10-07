@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 use Illuminate\Database\Eloquent\Model;
@@ -11,6 +12,7 @@ class ActivityAttachment extends Model
     protected $fillable = [
         'activity_type',
         'activity_id',
+        'official_business_trip_detail_id',
         'filename',
         'original_filename',
         'storage_disk',
@@ -36,6 +38,11 @@ class ActivityAttachment extends Model
     public function uploadedBy()
     {
         return $this->belongsTo(User::class, 'uploaded_by_user_id');
+    }
+
+    public function officialBusinessTripDetail(): BelongsTo
+    {
+        return $this->belongsTo(OfficialBusinessTripDetail::class);
     }
 
     public function messageEntries(): BelongsToMany

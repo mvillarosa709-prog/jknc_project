@@ -1,5 +1,56 @@
 <?php
 
+use App\Models\OfficialBusinessTrip;
+
 return [
     'default_travel_credit_value' => (float) env('OB_TRAVEL_CREDIT_VALUE', 500),
+    'classifications' => [
+        OfficialBusinessTrip::CLASSIFICATION_CLIENT,
+        OfficialBusinessTrip::CLASSIFICATION_INTERNAL,
+        OfficialBusinessTrip::CLASSIFICATION_SOCIAL,
+    ],
+    'internal_activity_types' => [
+        'Government / Regulatory Transaction',
+        'Banking / Finance',
+        'Document Submission / Collection',
+        'Procurement / Purchasing',
+        'Office Operations',
+        'Administrative Errand',
+        'Legal / Corporate Matter',
+        'Property / Facility Matter',
+        'HR / Personnel Matter',
+        'Training / Internal Development',
+        'Internal Meeting',
+        'Inspection / Verification',
+        'Delivery / Pickup',
+        'Other',
+    ],
+    'social_activity_types' => [
+        'Networking',
+        'Marketing / Promotion',
+        'Business Development',
+        'Client Prospecting',
+        'Industry Event',
+        'Chamber / Association Activity',
+        'Conference / Seminar',
+        'Courtesy Visit',
+        'Partnership / Collaboration',
+        'Corporate Representation',
+        'Community / CSR Activity',
+        'Social / Relationship Building',
+        'Other',
+    ],
+    'transportation_modes' => [
+        'Company Vehicle',
+        'Private Vehicle',
+        'Ride-Hailing',
+        'Taxi',
+        'Public Transportation',
+        'Rental Vehicle',
+        'Air',
+        'Sea/Ferry',
+        'Walking',
+        'Other',
+    ],
+    'suggestion_field_types' => ['from', 'destination', 'purpose'],
 ];

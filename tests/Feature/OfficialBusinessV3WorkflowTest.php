@@ -9,6 +9,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 
 beforeEach(function () {
     Notification::fake();
@@ -34,7 +36,6 @@ beforeEach(function () {
         $table->boolean('is_active')->default(true);
         $table->timestamps();
     });
-
 
     Schema::create('notifications', function (Blueprint $table): void {
         $table->uuid('id')->primary();
@@ -122,7 +123,11 @@ Schema::create('departments', function (Blueprint $table) {
         $table->id();
         $table->string('activity_type', 40);
         $table->unsignedBigInteger('activity_id');
-        $table->string('original_name');
+        $table->string('filename')->nullable();
+        $table->string('original_filename')->nullable();
+        $table->string('storage_disk', 40)->nullable();
+        $table->string('storage_path')->nullable();
+        $table->string('original_name')->nullable();
         $table->string('stored_name')->nullable();
         $table->text('path')->nullable();
         $table->text('external_url')->nullable();
@@ -694,6 +699,168 @@ test('submitted v3 official business can be explicitly reverted for correction',
             ->where('activity_id', $trip->id)
             ->where('action', 'reverted')
             ->count())->toBe(1);
+});
+
+function preparePhase2ObSchema(): void
+{
+    Schema::create('deals', function (Blueprint $table): void {
+        $table->id();
+        $table->string('deal_name')->nullable();
+        $table->timestamps();
+    });
+    Schema::create('projects', function (Blueprint $table): void {
+        $table->id();
+        $table->unsignedBigInteger('company_id')->nullable();
+        $table->unsignedBigInteger('deal_id')->nullable();
+        $table->string('name')->nullable();
+        $table->string('engagement_type')->nullable();
+        $table->string('status')->nullable();
+        $table->json('metadata')->nullable();
+        $table->timestamps();
+    });
+    (require database_path('migrations/2026_09_28_000002_create_official_business_master_personnel.php'))->up();
+    foreach ([
+        '2026_10_07_120000_add_classification_to_official_business_trips.php',
+        '2026_10_07_120100_create_official_business_trip_details_table.php',
+        '2026_10_07_120200_create_official_business_trip_detail_travel_table.php',
+        '2026_10_07_120300_create_official_business_trip_detail_transportation_table.php',
+        '2026_10_07_120400_add_official_business_trip_detail_id_to_activity_attachments_table.php',
+        '2026_10_07_120500_create_official_business_suggestions_table.php',
+        '2026_10_07_130000_add_phase2_fields_to_official_business_trip_personnel.php',
+    ] as $migration) {
+        (require database_path('migrations/'.$migration))->up();
+    }
+}
+
+test('classified draft saves and reopens stable master rows and team snapshots', function (string $classification): void {
+    preparePhase2ObSchema();
+    DB::table('employees')->insert([
+        ['id' => 71, 'user_id' => $this->manager->id, 'employee_code' => 'HC-71', 'first_name' => 'Primary', 'last_name' => 'Traveler', 'position' => 'Manager', 'immediate_supervisor' => 'Director'],
+        ['id' => 72, 'user_id' => null, 'employee_code' => 'HC-72', 'first_name' => 'Team', 'last_name' => 'Member', 'position' => 'Associate', 'immediate_supervisor' => 'Manager'],
+    ]);
+    $company = Company::create(['company_name' => 'Phase Two Client']);
+    $departmentId = DB::table('departments')->insertGetId(['department_name' => 'Operations']);
+    $projectId = DB::table('projects')->insertGetId(['company_id' => $company->id, 'name' => 'Monthly Retainer', 'engagement_type' => 'Regular', 'status' => 'In Progress']);
+    $row = ['from_location' => 'JK&C Office', 'destination' => 'Client Office', 'purpose' => 'Review'];
+    if ($classification === 'client') $row += ['company_id' => $company->id, 'engagement_type' => 'Regular', 'project_id' => $projectId];
+    if ($classification === 'internal') $row += ['internal_activity_type' => 'Internal Meeting', 'department_id' => $departmentId];
+    if ($classification === 'social') $row += ['activity_event_name' => 'Chamber Mixer', 'social_activity_type' => 'Networking'];
+    $row['travel'] = ['departure_date' => '2026-10-08', 'departure_time' => '08:15', 'expected_arrival_date' => '2026-10-08', 'expected_arrival_time' => '09:00', 'estimated_expense' => 0];
+    $row['transportation'] = ['mode' => 'Air', 'airline' => 'Sample Air', 'flight_number' => 'SA-8'];
+
+    $this->actingAs($this->manager)->post(route('human-capital.obf.store'), [
+        'intent' => 'save_draft', 'classification' => $classification,
+        'employee_id' => 71, 'nature_of_travel' => 'Team',
+        'team_member_employee_ids' => [72], 'team_natures_json' => json_encode(['71' => 'Team', '72' => 'Team']),
+        'details_json' => json_encode([$row, array_replace($row, ['purpose' => 'Second review'])]),
+    ])->assertSessionHas('success');
+
+    $trip = OfficialBusinessTrip::query()->sole();
+    expect($trip->classification)->toBe($classification)
+        ->and($trip->status)->toBe('Draft')
+        ->and($trip->employee_id)->toBe(71)
+        ->and($trip->personnel()->count())->toBe(2)
+        ->and($trip->personnel()->where('employee_id', 71)->sole()->role)->toBe('Primary Traveler')
+        ->and($trip->personnel()->where('employee_id', 72)->sole()->immediate_superior_snapshot)->toBe('Manager')
+        ->and($trip->details()->count())->toBe(2)
+        ->and($trip->details()->pluck('sort_order')->all())->toBe([1, 2])
+        ->and($trip->details()->with('travelDetail')->get()->pluck('travelDetail.departure_date')->map(fn ($date) => $date?->format('Y-m-d'))->all())->toBe(['2026-10-08', '2026-10-08'])
+        ->and($trip->details()->with('transportationDetail')->get()->pluck('transportationDetail.flight_number')->all())->toBe(['SA-8', 'SA-8']);
+    $ids = $trip->details()->pluck('id')->all();
+    $this->actingAs($this->manager)->put(route('human-capital.obf.update', $trip), [
+        'intent' => 'save_draft', 'classification' => $classification,
+        'employee_id' => 71, 'team_member_employee_ids' => [72],
+        'details_json' => json_encode($trip->details()->with(['travelDetail', 'transportationDetail'])->get()->map(function ($detail) {
+            return $detail->only(['id', 'from_location', 'destination', 'purpose', 'company_id', 'engagement_type', 'project_id', 'internal_activity_type', 'department_id', 'activity_event_name', 'social_activity_type']) + [
+                'travel' => [
+                    'departure_date' => $detail->travelDetail->getRawOriginal('departure_date'),
+                    'departure_time' => $detail->travelDetail->getRawOriginal('departure_time'),
+                    'expected_arrival_date' => $detail->travelDetail->getRawOriginal('expected_arrival_date'),
+                    'expected_arrival_time' => $detail->travelDetail->getRawOriginal('expected_arrival_time'),
+                    'estimated_expense' => $detail->travelDetail->getRawOriginal('estimated_expense'),
+                ],
+                'transportation' => $detail->transportationDetail->only(['mode', 'airline', 'flight_number']),
+            ];
+        })->all()),
+    ])->assertSessionHas('success');
+    expect($trip->fresh()->details()->pluck('id')->all())->toBe($ids)
+        ->and($trip->fresh()->details()->with('travelDetail')->get()->pluck('travelDetail.departure_time')->all())->toBe(['08:15', '08:15'])
+        ->and($trip->fresh()->details()->with('transportationDetail')->get()->pluck('transportationDetail.flight_number')->all())->toBe(['SA-8', 'SA-8'])
+        ->and($trip->fresh()->details()->count())->toBe(2)
+        ->and(DB::table('official_business_trip_detail_travel')->count())->toBe(2)
+        ->and(DB::table('official_business_trip_detail_transportation')->count())->toBe(2);
+    $page = $this->actingAs($this->manager)->get(route('human-capital.obf'))->assertOk();
+    $reloaded = collect($page->viewData('trips'))->firstWhere('id', $trip->id);
+    expect($reloaded['detail_rows'][0]['travel']['departure_date'])->toBe('2026-10-08')
+        ->and($reloaded['detail_rows'][0]['transportation']['mode'])->toBe('Air')
+        ->and($reloaded['detail_rows'][0]['transportation']['flight_number'])->toBe('SA-8');
+})->with(['client', 'internal', 'social']);
+
+test('classified draft attachments and remarks survive save edit and reload without duplicates', function (): void {
+    preparePhase2ObSchema();
+    Storage::fake('public');
+    DB::table('employees')->insert([
+        'id' => 81, 'user_id' => $this->manager->id, 'employee_code' => 'HC-81',
+        'first_name' => 'Draft', 'last_name' => 'Traveler', 'position' => 'Manager',
+    ]);
+    $departmentId = DB::table('departments')->insertGetId(['department_name' => 'Operations']);
+    $detailRow = [
+        'client_key' => 'detail-key-81', 'from_location' => 'Office', 'destination' => 'Regional Office',
+        'purpose' => 'File papers', 'internal_activity_type' => 'Internal Meeting', 'department_id' => $departmentId,
+        'travel' => [], 'transportation' => [],
+    ];
+    $attachmentRows = [[
+        'type' => 'Memo', 'detail_key' => 'detail-key-81', 'description' => 'Supporting memo', 'remove' => false,
+    ]];
+
+    $this->actingAs($this->manager)->post(route('human-capital.obf.store'), [
+        'intent' => 'save_draft', 'classification' => 'internal', 'employee_id' => 81,
+        'nature_of_travel' => 'Individual', 'remarks' => 'Parent level remark',
+        'details_json' => json_encode([$detailRow]),
+        'attachment_rows_json' => json_encode($attachmentRows),
+        'attachment_files' => [0 => UploadedFile::fake()->createWithContent('memo.pdf', '%PDF-1.4 test')],
+    ])->assertSessionHas('success');
+
+    $trip = OfficialBusinessTrip::query()->sole();
+    $attachment = \App\Models\ActivityAttachment::query()->where('activity_id', $trip->id)->sole();
+    $detailId = $trip->details()->sole()->id;
+    expect($trip->remarks)->toBe('Parent level remark')
+        ->and($attachment->official_business_trip_detail_id)->toBe($detailId)
+        ->and($attachment->metadata['description'])->toBe('Supporting memo')
+        ->and(Storage::disk('public')->exists($attachment->storage_path))->toBeTrue();
+
+    $detailRow['id'] = $detailId;
+    $attachmentRows[0]['id'] = $attachment->id;
+    $attachmentRows[0]['detail_key'] = 'detail:'.$detailId;
+    $this->actingAs($this->manager)->put(route('human-capital.obf.update', $trip), [
+        'intent' => 'save_draft', 'classification' => 'internal', 'employee_id' => 81,
+        'nature_of_travel' => 'Individual', 'remarks' => 'Parent level remark revised',
+        'details_json' => json_encode([$detailRow]),
+        'attachment_rows_json' => json_encode($attachmentRows),
+    ])->assertSessionHas('success');
+
+    $trip->refresh();
+    expect(\App\Models\ActivityAttachment::query()->where('activity_id', $trip->id)->count())->toBe(1)
+        ->and($trip->remarks)->toBe('Parent level remark revised')
+        ->and($trip->details()->sole()->id)->toBe($detailId)
+        ->and($trip->details()->sole()->attachments()->sole()->id)->toBe($attachment->id);
+
+    $page = $this->actingAs($this->manager)->get(route('human-capital.obf'))->assertOk();
+    $reloaded = collect($page->viewData('trips'))->firstWhere('id', $trip->id);
+    expect($reloaded['remarks'])->toBe('Parent level remark revised')
+        ->and($reloaded['create_attachments'][0]['detail_id'])->toBe($detailId)
+        ->and($reloaded['create_attachments'][0]['description'])->toBe('Supporting memo')
+        ->and($reloaded['create_attachments'][0])->not->toHaveKey('storage_path');
+
+    $attachmentRows[0]['remove'] = true;
+    $this->actingAs($this->manager)->put(route('human-capital.obf.update', $trip), [
+        'intent' => 'save_draft', 'classification' => 'internal', 'employee_id' => 81,
+        'nature_of_travel' => 'Individual', 'remarks' => 'Parent level remark revised',
+        'details_json' => '[]', 'attachment_rows_json' => json_encode($attachmentRows),
+    ])->assertSessionHas('success');
+    expect(\App\Models\ActivityAttachment::query()->where('activity_id', $trip->id)->count())->toBe(0)
+        ->and($trip->details()->count())->toBe(0)
+        ->and(Storage::disk('public')->exists($attachment->storage_path))->toBeFalse();
 });
 
 test('v3 json approval and revert preserve independent movement state', function () {

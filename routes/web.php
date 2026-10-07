@@ -1577,6 +1577,8 @@ Route::middleware(['auth', 'prevent-back-history', \App\Http\Middleware\EnsurePa
 
         Route::middleware('human-capital.module:access_hc_obf,true')->group(function () {
             Route::get('/obf', [OfficialBusinessTripController::class, 'index'])->name('obf');
+            Route::get('/obf/suggestions', [OfficialBusinessTripController::class, 'suggestions'])->name('obf.suggestions');
+            Route::get('/obf/engagements', [OfficialBusinessTripController::class, 'engagements'])->name('obf.engagements');
             Route::post('/obf', [OfficialBusinessTripController::class, 'store'])->name('obf.store');
             Route::put('/obf/{officialBusinessTrip}', [OfficialBusinessTripController::class, 'update'])->name('obf.update');
             Route::delete('/obf/{officialBusinessTrip}', [OfficialBusinessTripController::class, 'destroy'])->name('obf.destroy');

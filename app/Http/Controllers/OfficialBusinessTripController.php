@@ -8,6 +8,8 @@ use App\Http\Controllers\Concerns\UsesLatestGisCompanyHeader;
 use App\Models\Company;
 use App\Models\Contact;
 use App\Models\Employee;
+use App\Models\Department;
+use App\Models\Project;
 use App\Models\OfficialBusinessTrip;
 use App\Models\OfficialBusinessTripTicket;
 use App\Services\OfficialBusinessActivityService;
@@ -23,6 +25,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
 class OfficialBusinessTripController extends Controller
@@ -183,11 +187,15 @@ class OfficialBusinessTripController extends Controller
             })
             ->values();
 
-        $personnelEmployees = Employee::query()->orderBy('last_name')->get()
+        $personnelEmployees = Employee::query()->with('department')->orderBy('last_name')->get()
+            ->filter(fn (Employee $employee) => ! filled($employee->employment_status) || ! in_array(strtolower((string) $employee->employment_status), ['inactive', 'terminated', 'resigned'], true))
             ->map(fn (Employee $employee): array => [
                 'id' => $employee->id,
                 'employee_code' => $employee->employee_code,
                 'full_name' => $employee->full_name,
+                'position' => $this->effectiveEmployeePosition($employee),
+                'department' => $employee->department?->department_name,
+                'immediate_superior' => $this->employeeSuperiorName($employee),
             ])->values();
 
         $contacts = Contact::query()
@@ -247,7 +255,44 @@ class OfficialBusinessTripController extends Controller
             'canAdministerObf' => $authorization->canAdminister($user),
             'currentEmployee' => $currentEmployee,
             'companyHeader' => $this->latestGisCompanyHeader(),
+            'obClassifications' => config('official_business.classifications'),
+            'internalActivityTypes' => config('official_business.internal_activity_types'),
+            'socialActivityTypes' => config('official_business.social_activity_types'),
+            'obCompanies' => Company::query()->orderBy('company_name')->get(['id', 'company_name']),
+            'obDepartments' => Department::query()->orderBy('department_name')->get(['id', 'department_name']),
         ]);
+    }
+
+    public function suggestions(Request $request, \App\Services\OfficialBusinessSuggestionService $service): JsonResponse
+    {
+        abort_unless(app(OfficialBusinessAuthorizationService::class)->canView(Auth::user()), 403);
+        $input = $request->validate([
+            'field_type' => ['required', Rule::in(config('official_business.suggestion_field_types'))],
+            'q' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        return response()->json(['values' => $service->suggest($input['field_type'], $input['q'] ?? null)
+            ->pluck('display_value')->unique(fn ($value) => mb_strtolower($value))->values()]);
+    }
+
+    public function engagements(Request $request): JsonResponse
+    {
+        abort_unless(app(OfficialBusinessAuthorizationService::class)->canView(Auth::user()), 403);
+        $input = $request->validate([
+            'company_id' => ['required', 'integer', 'exists:companies,id'],
+            'type' => ['required', Rule::in(['Regular', 'Project'])],
+        ]);
+        $items = Project::query()->where('company_id', $input['company_id'])->get()
+            ->filter(fn (Project $project) => ! $project->isShell()
+                && ! in_array(strtolower((string) $project->status), ['completed', 'cancelled', 'archived', 'rejected'], true)
+                && (str_contains(strtolower((string) $project->engagement_type), 'regular') === ($input['type'] === 'Regular')))
+            ->map(fn (Project $project) => ['id' => $project->id, 'name' => $project->name])->values();
+        $company = Company::findOrFail($input['company_id']);
+        $credit = app(OfficialBusinessAuthorizationService::class)->canReadFinance(Auth::user())
+            ? app(\App\Services\CompanyTravelCreditService::class)->summary($company)['available_units']
+            : null;
+
+        return response()->json(['items' => $items, 'travel_credit_balance' => $credit]);
     }
 
     public function store(
@@ -272,6 +317,12 @@ class OfficialBusinessTripController extends Controller
 
         $validated = $this->validateObf($request, false, $isDraft);
         $validated = $this->validateMultipleClientRoutes($validated, $isDraft);
+        $detailRows = $this->validatedCreateDetails($validated, $isDraft);
+        $attachmentService = app(\App\Services\OfficialBusinessCreateAttachmentService::class);
+        $attachmentRows = filled($validated['classification'] ?? null)
+            ? $attachmentService->validate($request, null, $detailRows, $isDraft)
+            : [];
+        $validated = $this->projectCreateDetailsToLegacyHeader($validated, $detailRows);
 
         // Employee users always submit the O.B. as their own Human Capital
         // employee identity. Managers may continue selecting another employee.
@@ -383,20 +434,26 @@ class OfficialBusinessTripController extends Controller
             ],
 
             'transportation_mode' => $validated['transportation_mode'] ?? null,
-            'transportation_details' => $this->transportationDetails($validated),
+            'transportation_details' => $validated['transportation_details'] ?? $this->transportationDetails($validated),
             'estimated_expenses' => $validated['estimated_expenses'] ?? 0,
 
-            'attachment_paths' => $this->storeAttachments($request),
+            'attachment_paths' => filled($validated['classification'] ?? null)
+                ? []
+                : $this->storeAttachments($request),
             'attachment_types' => $validated['attachment_types'] ?? [],
             'attachment_other' => $validated['attachment_other'] ?? null,
 
             'remarks' => $validated['remarks'] ?? null,
             'workflow_version' => 3,
+            'classification' => $validated['classification'] ?? null,
             'status' => $isDraft ? 'Draft' : 'Submitted',
             'created_by' => Auth::id(),
             'client_report_description' => $validated['client_report_description'] ?? null,
             'include_in_client_report' => (bool) ($validated['include_in_client_report'] ?? false),
         ];
+        if (! Schema::hasColumn('official_business_trips', 'classification')) {
+            unset($tripAttributes['classification']);
+        }
         for ($attempt = 0; $attempt < 5; $attempt++) {
             try {
                 $trip = OfficialBusinessTrip::create($tripAttributes);
@@ -413,7 +470,13 @@ class OfficialBusinessTripController extends Controller
         $trip->prepared_by_user_id = Auth::id();
         $trip->save();
         app(\App\Services\OfficialBusinessMasterPersonnelService::class)
-            ->sync($trip, $validated['team_member_employee_ids'] ?? []);
+            ->sync($trip, $validated['team_member_employee_ids'] ?? [], $this->teamNatures($validated));
+        if (filled($validated['classification'] ?? null)) {
+            app(\App\Services\OfficialBusinessCreateDetailService::class)
+                ->sync($trip, $validated['classification'], $detailRows);
+            app(\App\Services\OfficialBusinessCreateDetailService::class)->rememberSuggestions($detailRows);
+            $attachmentService->persist($trip, $attachmentRows, $detailRows, $request);
+        }
 
         app(ActivityAuditService::class)->recordSemantic(
             ActivityTypeRegistry::OFFICIAL_BUSINESS_TRAVEL,
@@ -500,6 +563,12 @@ class OfficialBusinessTripController extends Controller
             $validated = $this->validateObf($request, true, $isDraft);
 
             $validated = $this->validateMultipleClientRoutes($validated, $isDraft);
+            $detailRows = $this->validatedCreateDetails($validated, $isDraft);
+            $attachmentService = app(\App\Services\OfficialBusinessCreateAttachmentService::class);
+            $attachmentRows = filled($validated['classification'] ?? null)
+                ? $attachmentService->validate($request, $officialBusinessTrip, $detailRows, $isDraft)
+                : [];
+            $validated = $this->projectCreateDetailsToLegacyHeader($validated, $detailRows);
 
             if ($this->canManageObf()) {
                 $employee = filled($validated['employee_id'] ?? null)
@@ -566,11 +635,17 @@ class OfficialBusinessTripController extends Controller
             }
 
             $existingAttachments = $officialBusinessTrip->attachment_paths ?? [];
-            $newAttachments = $this->storeAttachments($request);
+            $newAttachments = filled($validated['classification'] ?? null)
+                ? []
+                : $this->storeAttachments($request);
 
             DB::beginTransaction();
 
             try {
+                if (filled($validated['classification'] ?? null)) {
+                    $attachmentService->prepareExisting($officialBusinessTrip, $attachmentRows, $detailRows);
+                }
+
                 if (! $isClientTravel && $officialBusinessTrip->tripTickets()->exists()) {
                     $tripTicketService->syncClients(
                         Auth::user(),
@@ -580,6 +655,9 @@ class OfficialBusinessTripController extends Controller
                 }
 
                 $officialBusinessTrip->update([
+                ... (Schema::hasColumn('official_business_trips', 'classification')
+                    ? ['classification' => $validated['classification'] ?? $officialBusinessTrip->classification]
+                    : []),
                 'employee_id' => $employee?->id,
                 'employee_code' => $employee?->employee_code,
                 'employee_name' => $employee?->full_name,
@@ -635,15 +713,19 @@ class OfficialBusinessTripController extends Controller
                 ],
 
                 'transportation_mode' => $validated['transportation_mode'] ?? null,
-                'transportation_details' => $this->transportationDetails($validated),
+                'transportation_details' => $validated['transportation_details'] ?? $this->transportationDetails($validated),
 
                 'estimated_expenses' => $validated['estimated_expenses'] ?? 0,
 
                 'attachment_paths' => array_values(
                     array_merge($existingAttachments, $newAttachments)
                 ),
-                'attachment_types' => $validated['attachment_types'] ?? [],
-                'attachment_other' => $validated['attachment_other'] ?? null,
+                'attachment_types' => filled($validated['classification'] ?? null)
+                    ? ($officialBusinessTrip->attachment_types ?? [])
+                    : ($validated['attachment_types'] ?? []),
+                'attachment_other' => filled($validated['classification'] ?? null)
+                    ? $officialBusinessTrip->attachment_other
+                    : ($validated['attachment_other'] ?? null),
 
                 'remarks' => $validated['remarks'] ?? null,
                 'client_report_description' => $validated['client_report_description']
@@ -662,7 +744,13 @@ class OfficialBusinessTripController extends Controller
 
             if (array_key_exists('team_member_employee_ids', $validated)) {
                 app(\App\Services\OfficialBusinessMasterPersonnelService::class)
-                    ->sync($officialBusinessTrip, $validated['team_member_employee_ids']);
+                    ->sync($officialBusinessTrip, $validated['team_member_employee_ids'], $this->teamNatures($validated));
+            }
+            if (filled($validated['classification'] ?? null)) {
+                app(\App\Services\OfficialBusinessCreateDetailService::class)
+                    ->sync($officialBusinessTrip, $validated['classification'], $detailRows, (bool) ($validated['classification_change_confirmed'] ?? false));
+                app(\App\Services\OfficialBusinessCreateDetailService::class)->rememberSuggestions($detailRows);
+                $attachmentService->persist($officialBusinessTrip, $attachmentRows, $detailRows, $request);
             }
 
             $freshTrip = $officialBusinessTrip->fresh();
@@ -696,6 +784,7 @@ class OfficialBusinessTripController extends Controller
                 DB::commit();
             } catch (\Throwable $exception) {
                 DB::rollBack();
+                $attachmentService->cleanupUncommittedUploads();
 
                 throw $exception;
             }
@@ -1439,12 +1528,102 @@ class OfficialBusinessTripController extends Controller
             $stop->save();
         }
     }
+    private function validatedCreateDetails(array $validated, bool $isDraft): array
+    {
+        if (! filled($validated['classification'] ?? null)) {
+            return [];
+        }
+        $service = app(\App\Services\OfficialBusinessCreateDetailService::class);
+
+        return $service->validateRows($service->decode($validated['details_json'] ?? null), $validated['classification'], $isDraft);
+    }
+
+    private function projectCreateDetailsToLegacyHeader(array $validated, array $rows): array
+    {
+        if (! filled($validated['classification'] ?? null)) {
+            return $validated;
+        }
+        $first = $rows[0] ?? [];
+        $travel = $first['travel'] ?? [];
+        $transportation = $first['transportation'] ?? [];
+        $validated['is_client_travel'] = $validated['classification'] === OfficialBusinessTrip::CLASSIFICATION_CLIENT;
+        $validated['client_mode'] = 'single';
+        $validated['destination'] = $first['destination'] ?? null;
+        $validated['purpose'] = $first['purpose'] ?? null;
+        $validated['company_id'] = $validated['is_client_travel'] ? ($first['company_id'] ?? null) : null;
+        $validated['deal_id'] = $validated['is_client_travel'] ? ($first['deal_id'] ?? null) : null;
+        $validated['project_id'] = $validated['is_client_travel'] ? ($first['project_id'] ?? null) : null;
+        $validated['date_from'] = $travel['departure_date'] ?? null;
+        $validated['departure_time'] = $travel['departure_time'] ?? null;
+        $validated['date_to'] = $travel['expected_arrival_date'] ?? null;
+        $validated['return_time'] = $travel['expected_arrival_time'] ?? null;
+        $expenses = collect($rows)->map(fn ($row) => data_get($row, 'travel.estimated_expense'))
+            ->filter(fn ($amount) => filled($amount));
+        $validated['estimated_expenses'] = $expenses->isEmpty() ? 0 : $expenses->sum();
+        $validated['transportation_mode'] = $transportation['mode'] ?? null;
+        $validated['transportation_details'] = $this->compatibleLegacyTransportationDetails($transportation);
+
+        return $validated;
+    }
+
+    private function compatibleLegacyTransportationDetails(array $transportation): array
+    {
+        return match ($transportation['mode'] ?? null) {
+            'Company Vehicle' => [
+                'company_vehicle' => $transportation['vehicle'] ?? null,
+                'vehicle_details' => $transportation['vehicle'] ?? null,
+                'plate_number' => $transportation['plate_number'] ?? null,
+                'assigned_driver' => $transportation['driver'] ?? null,
+            ],
+            'Private Vehicle' => [
+                'private_vehicle_details' => $transportation['vehicle'] ?? null,
+                'plate_number' => $transportation['plate_number'] ?? null,
+                'assigned_driver' => $transportation['owner_driver'] ?? null,
+            ],
+            'Ride-Hailing' => ['ride_hailing_provider' => $transportation['provider'] ?? null],
+            'Taxi' => ['other_description' => $transportation['other_details'] ?? null],
+            'Public Transportation' => ['public_transport_mode' => $transportation['transport_type'] ?? null],
+            'Rental Vehicle' => [
+                'vehicle_details' => $transportation['vehicle'] ?? null,
+                'plate_number' => $transportation['plate_number'] ?? null,
+                'other_description' => $transportation['rental_provider'] ?? null,
+            ],
+            'Air' => [
+                'carrier' => $transportation['airline'] ?? null,
+                'booking_reference' => $transportation['flight_number'] ?? null,
+                'air_travel_details' => $transportation['flight_number'] ?? null,
+            ],
+            'Sea/Ferry' => [
+                'carrier' => $transportation['shipping_line'] ?? null,
+                'booking_reference' => $transportation['vessel_trip'] ?? null,
+                'sea_travel_details' => $transportation['vessel_trip'] ?? null,
+            ],
+            'Other' => ['other_description' => $transportation['other_details'] ?? null],
+            default => [],
+        };
+    }
+
+    private function teamNatures(array $validated): array
+    {
+        $natures = json_decode($validated['team_natures_json'] ?? '{}', true);
+        if (! is_array($natures)) {
+            return [];
+        }
+        return collect($natures)->filter(fn ($nature, $id) => is_numeric($id)
+            && in_array($nature, ['Individual', 'Team'], true))->all();
+    }
+
     private function validateObf(
         Request $request,
         bool $isUpdate = false,
         bool $isDraft = false
     ): array {
+        $enhanced = filled($request->input('classification'));
         return $request->validate([
+            'classification' => ['nullable', Rule::in(config('official_business.classifications'))],
+            'details_json' => ['nullable', 'string'],
+            'team_natures_json' => ['nullable', 'string'],
+            'classification_change_confirmed' => ['nullable', 'boolean'],
             'employee_id' => [$isDraft || $isUpdate || ! $this->canManageObf() ? 'nullable' : 'required', 'nullable', 'exists:employees,id'],
 
             'immediate_superior' => ['nullable', 'string', 'max:255'],
@@ -1452,6 +1631,7 @@ class OfficialBusinessTripController extends Controller
 
             'destination' => [
                 $isDraft
+                    || $enhanced
                     || ! filter_var(
                         $request->input('is_client_travel'),
                         FILTER_VALIDATE_BOOLEAN
@@ -1464,12 +1644,12 @@ class OfficialBusinessTripController extends Controller
                 'max:255',
             ],
             'additional_stops' => ['nullable', 'string'],
-            'purpose' => [$isDraft ? 'nullable' : 'required', 'nullable', 'string'],
+            'purpose' => [$isDraft || $enhanced ? 'nullable' : 'required', 'nullable', 'string'],
             'purpose_options' => ['nullable', 'array'],
             'purpose_options.*' => ['nullable', 'string', 'max:255'],
             'purpose_other' => ['nullable', 'string', 'max:255'],
             'trip_type' => ['nullable', 'string', 'max:255'],
-            'date_from' => [$isDraft ? 'nullable' : 'required', 'nullable', 'date'],
+            'date_from' => [$isDraft || $enhanced ? 'nullable' : 'required', 'nullable', 'date'],
             'date_to' => $isDraft
                 ? ['nullable', 'date']
                 : ['nullable', 'date', 'after_or_equal:date_from'],
@@ -1535,6 +1715,7 @@ class OfficialBusinessTripController extends Controller
             'attachment_types' => ['nullable', 'array'],
             'attachment_types.*' => ['nullable', 'string', 'max:255'],
             'attachment_other' => ['nullable', 'string', 'max:255'],
+            'attachment_rows_json' => ['nullable', 'string'],
             'attachments' => ['nullable', 'array'],
             'attachments.*' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'],
 
@@ -1689,6 +1870,46 @@ class OfficialBusinessTripController extends Controller
             'can_edit' => app(OfficialBusinessAuthorizationService::class)->canEdit(Auth::user(), $trip),
             'can_delete' => $this->canDeleteTrip($trip),
             'ob_reference_no' => $trip->ob_reference_no,
+            'classification' => $trip->classification,
+            'detail_rows' => Schema::hasTable('official_business_trip_details')
+                ? $trip->details()->with(['project', 'travelDetail', 'transportationDetail'])->orderBy('sort_order')->orderBy('id')->get()
+                    ->map(function ($detail): array {
+                        $row = $detail->toArray();
+                        unset($row['project'], $row['travel_detail'], $row['transportation_detail']);
+                        $travel = $detail->travelDetail;
+                        $row['travel'] = $travel ? [
+                            'departure_date' => $travel->getRawOriginal('departure_date'),
+                            'departure_time' => $travel->getRawOriginal('departure_time'),
+                            'expected_arrival_date' => $travel->getRawOriginal('expected_arrival_date'),
+                            'expected_arrival_time' => $travel->getRawOriginal('expected_arrival_time'),
+                            'estimated_expense' => $travel->getRawOriginal('estimated_expense'),
+                        ] : [];
+                        $row['transportation'] = $detail->transportationDetail?->only([
+                            'mode', 'vehicle', 'plate_number', 'driver', 'owner_driver', 'provider',
+                            'transport_type', 'rental_provider', 'airline', 'flight_number',
+                            'shipping_line', 'vessel_trip', 'other_details',
+                        ]) ?? [];
+                        $row['engagement_name'] = $detail->project?->name;
+                        $company = $detail->company_id && app(OfficialBusinessAuthorizationService::class)->canReadFinance(Auth::user())
+                            ? Company::find($detail->company_id) : null;
+                        $row['travel_credit_balance'] = $company && Schema::hasTable('company_travel_credit_accounts')
+                            ? app(\App\Services\CompanyTravelCreditService::class)->summary($company)['available_units']
+                            : null;
+                        return $row;
+                    })->all()
+                : [],
+            'personnel_rows' => Schema::hasTable('official_business_trip_personnel')
+                ? $trip->personnel()->orderBy('id')->get()->map(fn ($member) => [
+                    'employee_id' => $member->employee_id,
+                    'role' => $member->role ?? null,
+                    'nature_of_travel' => $member->nature_of_travel ?? null,
+                    'employee_code' => $member->employee_code_snapshot,
+                    'employee_name' => $member->employee_name_snapshot,
+                    'position' => $member->position_snapshot,
+                    'department' => $member->department_snapshot,
+                    'immediate_superior' => $member->immediate_superior_snapshot ?? null,
+                ])->all()
+                : [],
             'employee_id' => $trip->employee_id,
             'employee_code' => $trip->employee_code,
             'employee_name' => $trip->employee_name,
@@ -1742,6 +1963,22 @@ class OfficialBusinessTripController extends Controller
             'attachment_paths' => $trip->attachment_paths ?? [],
             'attachment_types' => $trip->attachment_types ?? [],
             'attachment_other' => $trip->attachment_other,
+            'create_attachments' => Schema::hasTable('activity_attachments')
+                ? \App\Models\ActivityAttachment::query()
+                    ->where('activity_type', ActivityTypeRegistry::OFFICIAL_BUSINESS_TRAVEL)
+                    ->where('activity_id', $trip->id)
+                    ->orderBy('uploaded_at')->orderBy('id')->get()
+                    ->map(fn (\App\Models\ActivityAttachment $attachment): array => [
+                        'id' => $attachment->id,
+                        'type' => $attachment->category,
+                        'description' => $attachment->metadata['description'] ?? '',
+                        'filename' => $attachment->original_filename ?: $attachment->filename,
+                        'url' => $attachment->external_url ?: ($attachment->storage_disk && $attachment->storage_path
+                            ? Storage::disk($attachment->storage_disk)->url($attachment->storage_path)
+                            : null),
+                        'detail_id' => $attachment->official_business_trip_detail_id,
+                    ])->all()
+                : [],
 
             'remarks' => $trip->remarks,
             'workflow_version' => (int) $trip->workflow_version,

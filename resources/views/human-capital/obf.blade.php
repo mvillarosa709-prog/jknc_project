@@ -201,7 +201,7 @@
                 <button type="button" @click="closePanel()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
             </div>
 
-            <div class="flex-1 min-h-0 grid grid-cols-[58%_42%] gap-0 bg-gray-50">
+            <div class="flex-1 min-h-0 grid grid-cols-1 grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-rows-1 lg:grid-cols-[58%_42%] gap-0 bg-gray-50">
                 {{-- LEFT LIVE PREVIEW --}}
                 <div class="min-h-0 flex flex-col border-r bg-gray-100">
                     <div class="shrink-0 flex items-center justify-between border-b border-gray-200 bg-gray-100 px-5 py-4">
@@ -229,6 +229,10 @@
                             <div><b>Date & Time:</b><strong>{{ now()->format('n/j/Y h:i:s A') }}</strong></div>
                         </div>
 
+                        <div x-show="form.classification" x-cloak>
+                            @include('human-capital.partials.obf-create-preview')
+                        </div>
+                        <div x-show="!form.classification" x-cloak>
                                                                         <div class="section-title">
                             Client & Billability Section
                         </div>
@@ -1068,6 +1072,7 @@
     </template>
 
 </div>
+                        </div>
 <div class="section-title">Attachments</div>
                         <table class="preview-table">
                             <tr>
@@ -1117,10 +1122,23 @@
                         enctype="multipart/form-data"
                         :action="isEdit ? `{{ url('/human-capital/obf') }}/${form.id}` : `{{ url('/human-capital/obf') }}`"
                         class="p-5 space-y-6"
+                        @input="dirty = true"
+                        @change="dirty = true"
+                        @submit="dirty = false"
                      novalidate>
                         @csrf
 
                         <input type="hidden" name="ob_reference_no" :value="form.ob_reference_no || ''">
+                        <input type="hidden" name="classification" :value="form.classification || ''">
+                        <input type="hidden" name="employee_id" :value="form.classification ? (form.employee_id || '') : ''" :disabled="!form.classification">
+                        <input type="hidden" name="nature_of_travel" :value="form.classification ? (form.nature_of_travel || '') : ''" :disabled="!form.classification">
+                        <input type="hidden" name="details_json" :value="JSON.stringify(form.detail_rows || [])" :disabled="!form.classification">
+                        <input type="hidden" name="attachment_rows_json" :value="JSON.stringify(form.classification ? form.create_attachments || [] : [])" :disabled="!form.classification">
+                        <input type="hidden" name="team_natures_json" :value="JSON.stringify(teamNatures())" :disabled="!form.classification">
+                        <input type="hidden" name="classification_change_confirmed" :value="form.classification_change_confirmed ? '1' : '0'" :disabled="!form.classification">
+                        <template x-for="member in (form.classification ? form.team_rows || [] : [])" :key="member.employee_id">
+                            <input type="hidden" name="team_member_employee_ids[]" :value="member.employee_id">
+                        </template>
 
                         <template x-if="isEdit">
                             <input type="hidden" name="_method" value="PUT">
@@ -1133,8 +1151,10 @@
                             </div>
                         </template>
 
+                        @include('human-capital.partials.obf-create-form')
+                        <fieldset x-show="!form.classification && isEdit" :disabled="Boolean(form.classification) || !isEdit" x-cloak>
                         {{-- A --}}
-                        <section class="form-section">
+                        <section class="form-section" x-show="!form.classification">
                             <h3 class="form-title">Client & Billability Section</h3>
 
                             <div class="grid grid-cols-2 gap-4">
@@ -1836,8 +1856,9 @@
                             </div>
                         </section>
 
+                        </fieldset>
                         {{-- G --}}
-                        <section class="form-section">
+                        <section class="form-section" x-show="!form.classification">
                             <h3 class="form-title">Attachments</h3>
 
                             <div class="space-y-4">
@@ -2138,6 +2159,18 @@ function obfPage() {
     return {
         employees: @json($employees),
         personnelEmployees: @json($personnelEmployees),
+        classifications: @json($obClassifications),
+        internalActivityTypes: @json($internalActivityTypes),
+        socialActivityTypes: @json($socialActivityTypes),
+        companies: @json($obCompanies),
+        departments: @json($obDepartments),
+        suggestions: {from: [], destination: [], purpose: []},
+        engagements: [],
+        teamModalOpen: false,
+        teamDraft: {employee_id: '', nature_of_travel: ''},
+        detailModalOpen: false,
+        detailModalIndex: null,
+        detailDraft: {},
         currentEmployeeId: @json($currentEmployee?->id),
         contacts: @json($contacts ?? []),
         trips: @json($trips),
@@ -2153,13 +2186,199 @@ function obfPage() {
         showPanel: false,
         isEdit: false,
         isView: false,
+        dirty: false,
 
         purposeOptionList: ['Official Business Travel', 'Site Inspection', 'Training / Seminar', 'Operations Support', 'Field Work', 'Audit', 'Client Meeting', 'Delivery / Pickup', 'Others'],
         clientPaymentOptionList: ['Transportation', 'Meals Per Diem', 'Miscellaneous', 'Vehicle Rental', 'Fuel', 'Airline Boat Tickets', 'Driver Fee', 'Toll Parking', 'Accommodation', 'Others'],
         attachmentTypeList: ['Rental Contract', 'Flight Ticket', 'Transmital form', 'Memo', 'Client Contract', 'Clients Approval', 'Picture of Meter', 'Others'],
+        createAttachmentTypes: ['Rental Contract', 'Flight Ticket', 'Transmittal Form', 'Memo', 'Client Contract', 'Client Approval', 'Picture of Meter', 'Others'],
 
         form: {},
         preview: {},
+
+        classificationLabel(value = this.form.classification) {
+            return {client: 'Client O.B.', internal: 'Internal / Company O.B.', social: 'Social / Marketing / Non-Creditable'}[value] || '-';
+        },
+        detailSectionTitle() {
+            return {client: 'Client Official Business', internal: 'Internal O.B. Details', social: 'Social / Marketing Activity'}[this.form.classification] || 'O.B. Details';
+        },
+        detailAddLabel() {
+            return {client: '+ Add Client', internal: '+ Add Internal Activity', social: '+ Add Activity'}[this.form.classification] || '+ Add Detail';
+        },
+        changeClassification(value) {
+            if (this.isView || this.form.classification === value) return;
+            const linked = (this.form.create_attachments || []).some(item => !item.remove && item.detail_key);
+            if (linked) {
+                window.alert('Relink or remove each detail-linked attachment before changing classification.');
+                return;
+            }
+            if ((this.form.detail_rows || []).length) {
+                if (!window.confirm('Changing the O.B. Classification will remove the current O.B. Detail entries because their fields are specific to the selected classification. Continue?')) return;
+                this.form.detail_rows = [];
+                this.form.classification_change_confirmed = true;
+            }
+            this.form.classification = value;
+            this.form.is_client_travel = value === 'client' ? '1' : '0';
+            this.detailModalOpen = false;
+            this.dirty = true;
+        },
+        selectedTeamEmployee() {
+            return this.personnelEmployees.find(employee => String(employee.id) === String(this.teamDraft.employee_id));
+        },
+        addTeamMember() {
+            const employee = this.selectedTeamEmployee();
+            if (!employee || !this.teamDraft.nature_of_travel || String(employee.id) === String(this.form.employee_id)
+                || (this.form.team_rows || []).some(row => String(row.employee_id) === String(employee.id))) return;
+            this.form.team_rows.push({...employee, employee_id: employee.id, nature_of_travel: this.teamDraft.nature_of_travel});
+            this.teamModalOpen = false;
+            this.dirty = true;
+        },
+        removePrimaryFromTeam() {
+            this.form.team_rows = (this.form.team_rows || []).filter(row => String(row.employee_id) !== String(this.form.employee_id));
+        },
+        removeTeamMember(index) {
+            this.form.team_rows.splice(index, 1);
+            this.dirty = true;
+        },
+        teamNatures() {
+            const result = {};
+            if (this.form.employee_id) result[this.form.employee_id] = this.form.nature_of_travel || '';
+            for (const row of this.form.team_rows || []) result[row.employee_id] = row.nature_of_travel;
+            return result;
+        },
+        clientName(id) { return this.companies.find(item => String(item.id) === String(id))?.company_name || '-'; },
+        departmentName(id) { return this.departments.find(item => String(item.id) === String(id))?.department_name || '-'; },
+        contactName(id) { return this.contacts.find(item => String(item.id) === String(id))?.full_name || ''; },
+        detailHeading(row) {
+            if (this.form.classification === 'client') return this.clientName(row.company_id);
+            if (this.form.classification === 'social') return row.activity_event_name || '-';
+            return row.from_location || '-';
+        },
+        detailRelated(row) {
+            if (this.form.classification === 'client') return this.engagements.find(item => String(item.id) === String(row.project_id))?.name || row.engagement_name || (row.project_id ? `#${row.project_id}` : '-');
+            if (this.form.classification === 'internal') return this.departmentName(row.department_id);
+            return row.organization_host || '-';
+        },
+        detailDescription(row) {
+            if (this.form.classification === 'client') return `${row.engagement_type || '-'} / ${this.detailRelated(row)} / Credit: ${row.travel_credit_balance ?? '—'}`;
+            if (this.form.classification === 'internal') return `${row.internal_activity_type || '-'} / ${this.departmentName(row.department_id)}`;
+            return `${row.social_activity_type || '-'} / ${row.organization_host || '-'}`;
+        },
+        detailTripLabel(row) {
+            if (this.form.classification === 'client') {
+                return this.clientName(row.company_id) + (row.engagement_name ? ` / ${row.engagement_name}` : '');
+            }
+            if (this.form.classification === 'internal') {
+                return `${row.internal_activity_type || 'Internal O.B.'}${row.department_id ? ` / ${this.departmentName(row.department_id)}` : ''}`;
+            }
+            return row.activity_event_name || 'Social / Marketing Activity';
+        },
+        transportationDescription(transportation) {
+            const fields = {
+                'Company Vehicle': ['vehicle', 'plate_number', 'driver'],
+                'Private Vehicle': ['vehicle', 'plate_number', 'owner_driver'],
+                'Ride-Hailing': ['provider'],
+                Taxi: ['other_details'],
+                'Public Transportation': ['transport_type'],
+                'Rental Vehicle': ['rental_provider', 'vehicle', 'plate_number'],
+                Air: ['airline', 'flight_number'],
+                'Sea/Ferry': ['shipping_line', 'vessel_trip'],
+                Other: ['other_details'],
+            }[transportation.mode] || [];
+            const labels = {vehicle:'Vehicle',plate_number:'Plate',driver:'Driver',owner_driver:'Owner / Driver',provider:'Provider',transport_type:'Type',rental_provider:'Rental Provider',airline:'Airline',flight_number:'Flight',shipping_line:'Shipping Line',vessel_trip:'Vessel / Trip',other_details:'Details'};
+            return fields.map(field => transportation[field] ? `${labels[field]}: ${transportation[field]}` : '').filter(Boolean).join(' · ') || (transportation.mode === 'Walking' ? '—' : '-');
+        },
+        ensureDetailChildren(row) {
+            if (!row.client_key && !row.id) row.client_key = this.makeClientKey();
+            row.travel = {...(row.travel || {})};
+            row.transportation = {...(row.transportation || {})};
+            return row;
+        },
+        clearTransportationForMode(index, mode) {
+            const row = this.ensureDetailChildren(this.form.detail_rows[index]);
+            const fields = ['vehicle','plate_number','driver','owner_driver','provider','transport_type','rental_provider','airline','flight_number','shipping_line','vessel_trip','other_details'];
+            fields.forEach(field => row.transportation[field] = '');
+            row.transportation.mode = mode;
+        },
+        moveDetail(index, offset) {
+            const target = index + offset;
+            if (target < 0 || target >= this.form.detail_rows.length) return;
+            const [row] = this.form.detail_rows.splice(index, 1);
+            this.form.detail_rows.splice(target, 0, row);
+            this.dirty = true;
+        },
+        openDetailModal(index = null) {
+            this.detailModalIndex = index;
+            this.detailDraft = index === null ? {} : {...this.form.detail_rows[index]};
+            this.engagements = [];
+            this.detailModalOpen = true;
+            if (this.form.classification === 'client' && this.detailDraft.company_id && this.detailDraft.engagement_type) this.refreshEngagements(true);
+        },
+        async refreshEngagements(preserveSelection = false) {
+            const selected = preserveSelection ? this.detailDraft.project_id : '';
+            this.detailDraft.project_id = selected;
+            this.engagements = [];
+            this.detailDraft.travel_credit_balance = null;
+            if (!this.detailDraft.company_id || !this.detailDraft.engagement_type) return;
+            const params = new URLSearchParams({company_id: this.detailDraft.company_id, type: this.detailDraft.engagement_type});
+            const response = await fetch(`{{ route('human-capital.obf.engagements') }}?${params}`, {headers: {'Accept': 'application/json'}});
+            if (!response.ok) return;
+            const data = await response.json();
+            this.engagements = data.items || [];
+            this.detailDraft.travel_credit_balance = data.travel_credit_balance;
+            if (!this.engagements.some(item => String(item.id) === String(selected))) this.detailDraft.project_id = '';
+        },
+        async loadSuggestions(field) {
+            const response = await fetch(`{{ route('human-capital.obf.suggestions') }}?field_type=${encodeURIComponent(field)}`, {headers: {'Accept': 'application/json'}});
+            if (response.ok) this.suggestions[field] = (await response.json()).values || [];
+        },
+        saveDetail() {
+            const row = this.ensureDetailChildren({...this.detailDraft});
+            if (this.form.classification === 'client') row.engagement_name = this.engagements.find(item => String(item.id) === String(row.project_id))?.name || row.engagement_name || '';
+            if (this.detailModalIndex === null) this.form.detail_rows.push(row);
+            else this.form.detail_rows[this.detailModalIndex] = row;
+            this.detailModalOpen = false;
+            this.dirty = true;
+        },
+        removeDetail(index) {
+            const row = this.form.detail_rows[index];
+            const key = this.detailReference(row);
+            if ((this.form.create_attachments || []).some(item => !item.remove && item.detail_key === key)) {
+                window.alert('This O.B. Detail has linked attachments. Relink or remove those attachments before removing the detail.');
+                return;
+            }
+            if (!window.confirm('Remove this O.B. Detail and its linked Travel and Transportation details?')) return;
+            this.form.detail_rows.splice(index, 1);
+            this.dirty = true;
+        },
+        makeClientKey() {
+            return window.crypto?.randomUUID ? window.crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        },
+        detailReference(row) {
+            return row?.id ? `detail:${row.id}` : (row?.client_key || '');
+        },
+        attachmentTripLabel(row) {
+            const route = `${row.from_location || '-'} → ${row.destination || '-'}`;
+            if (this.form.classification === 'client') return `${this.clientName(row.company_id)}  ${route}`;
+            if (this.form.classification === 'internal') return `Internal  ${route}`;
+            return `${row.activity_event_name || 'Activity / Event'}  ${route}`;
+        },
+        addCreateAttachment() {
+            this.form.create_attachments ||= [];
+            this.form.create_attachments.push({id: null, key: this.makeClientKey(), type: '', detail_key: '', description: '', filename: '', url: '', remove: false});
+            this.dirty = true;
+        },
+        setCreateAttachmentFile(index, event) {
+            const file = event.target.files?.[0];
+            if (file && this.form.create_attachments[index]) this.form.create_attachments[index].filename = file.name;
+            this.dirty = true;
+        },
+        removeCreateAttachment(index) {
+            const row = this.form.create_attachments[index];
+            if (row?.id) row.remove = true;
+            else this.form.create_attachments.splice(index, 1);
+            this.dirty = true;
+        },
 
         init() {
             const parameters = new URLSearchParams(window.location.search);
@@ -2221,6 +2440,10 @@ function obfPage() {
         blankForm() {
             return {
                 id: null,
+                classification: '',
+                classification_change_confirmed: false,
+                detail_rows: [],
+                team_rows: [],
                 ob_reference_no: '',
                 employee_id: '',
                 employee_name: '',
@@ -2291,6 +2514,7 @@ function obfPage() {
                 attachment_paths: [],
                 attachment_types: [],
                 attachment_other: '',
+                create_attachments: [],
 
                 remarks: '',
                 status: 'Pending',
@@ -2325,6 +2549,7 @@ function obfPage() {
                 }
             }
             this.showPanel = true;
+            this.dirty = false;
         },
 
         openView(trip) {
@@ -2334,6 +2559,7 @@ function obfPage() {
             this.hydrateClientRouteMap(trip);
             this.setPreviewFromTrip(trip);
             this.showPanel = true;
+            this.dirty = false;
         },
 
         openEdit(trip) {
@@ -2346,14 +2572,17 @@ function obfPage() {
 
             this.setPreviewFromTrip(trip);
             this.showPanel = true;
+            this.dirty = false;
         },
 
         closePanel() {
+            if (!this.isView && this.dirty && !window.confirm('Discard unsaved changes? Nothing will be saved.')) return;
             this.showPanel = false;
             this.isView = false;
             this.isEdit = false;
             this.form = {};
             this.preview = {};
+            this.dirty = false;
         },
 
         hydrateTrip(trip) {
@@ -2363,6 +2592,10 @@ function obfPage() {
             return {
                 ...this.blankForm(),
                 ...trip,
+                detail_rows: Array.isArray(trip.detail_rows) ? trip.detail_rows.map(row => this.ensureDetailChildren({...row})) : [],
+                team_rows: Array.isArray(trip.personnel_rows) ? trip.personnel_rows
+                    .filter(row => String(row.employee_id) !== String(trip.employee_id))
+                    .map(row => ({...this.personnelEmployees.find(employee => String(employee.id) === String(row.employee_id)), ...row, full_name: row.employee_name || ''})) : [],
                 purpose_options: trip.purpose_options || [],
                 team_members: trip.team_members && trip.team_members.length ? [...trip.team_members, '', '', ''].slice(0, 3) : ['', '', ''],
                 team_member_employee_ids: Array.isArray(trip.team_member_employee_ids)
@@ -2388,6 +2621,7 @@ function obfPage() {
                 client_payment_items: trip.client_payment_items || [],
                 attachment_paths: trip.attachment_paths || [],
                 attachment_types: trip.attachment_types || [],
+                create_attachments: Array.isArray(trip.create_attachments) ? trip.create_attachments.map(item => ({...item, detail_key: item.detail_id ? `detail:${item.detail_id}` : '', key: `attachment-${item.id}`, remove: false})) : [],
                 travel_credit_monthly_limit: credits.monthly_limit || '',
                 travel_credit_used: credits.used_this_month || '',
                 travel_credit_needed: credits.needed_for_trip || '',

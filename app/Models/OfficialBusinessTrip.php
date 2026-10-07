@@ -9,6 +9,10 @@ class OfficialBusinessTrip extends Model
 {
         use SoftDeletes;
 
+    public const CLASSIFICATION_CLIENT = 'client';
+    public const CLASSIFICATION_INTERNAL = 'internal';
+    public const CLASSIFICATION_SOCIAL = 'social';
+
 protected $fillable = [
         'ob_reference_no',
 
@@ -36,6 +40,7 @@ protected $fillable = [
         'team_members',
 
         'is_client_travel',
+        'classification',
         'company_id',
         'contact_id',
         'deal_id',
@@ -117,6 +122,13 @@ protected $fillable = [
     public function personnel(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(OfficialBusinessTripPersonnel::class);
+    }
+
+    public function details(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OfficialBusinessTripDetail::class)
+            ->orderBy('sort_order')
+            ->orderBy('id');
     }
 
     public function employee()
