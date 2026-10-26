@@ -3,12 +3,12 @@
     $user = auth()->user();
     $canUploadProof = ($canUploadProof ?? false) || ($user?->can('uploadProof', $transmittal) ?? false);
     $canRequestAcknowledgment = $user?->can('transmit', $transmittal) ?? false;
-    $canPrintPdf = ($user?->can('view', $transmittal) ?? false) || $draftWorkspace;
-    $canCancelTransmittal = ($draftWorkspace && in_array($transmittal->status, ['draft', 'rejected'], true))
-        || ($user?->canApproveTransmittals() && in_array($transmittal->status, ['draft', 'pending_approval', 'rejected'], true));
+    $canPrintPdf = ($user?->can('view', $transmittal) ?? false) || ($canViewPrivateFiles ?? false);
+    $canCancelTransmittal = ($canManageLifecycle ?? false)
+        && in_array($transmittal->status, ['draft', 'pending_approval', 'rejected'], true);
 @endphp
 <aside class="transmittal-action-panel" data-action-panel aria-label="Transmittal actions" hidden>
-    <h2>Action Center</h2>
+    <header class="action-panel-heading"><h2>Action Center</h2><button type="button" class="action-panel-close" data-close-action-panel aria-label="Close Action Center">&times;</button></header>
     <p class="muted">Operational actions for this TRN</p>
     <button class="action-panel-button" type="button" data-toggle-proof-form @unless ($canUploadProof) data-action-feedback="The preparer can add draft proof; otherwise an authorized approver can add proof after submission." @endunless>Upload proof</button>
     <button class="action-panel-button" type="button" data-open-proof-file @unless ($canUploadProof) data-action-feedback="Proof upload is unavailable for your account or this transmittal status." @endunless>Take photo / video</button>
@@ -76,21 +76,45 @@
         </section>
     </div>
     @if ($canRequestAcknowledgment)
-        <form method="post" action="{{ route('transmittals.transmit', $transmittal) }}">@csrf<button class="action-panel-button" type="submit">Request acknowledgment</button></form>
+        <form method="post" action="{{ route('transmittals.transmit', $transmittal) }}" data-confirm="Send the acknowledgment request email to the transmittal recipient(s)?">@csrf<button class="action-panel-button" type="submit">Request acknowledgment</button></form>
     @else
         <button class="action-panel-button" type="button" data-action-feedback="Request acknowledgment is available after approval and for an authorized sender.">Request acknowledgment</button>
     @endif
     <p class="action-panel-feedback" data-action-feedback-message role="status" aria-live="polite" hidden></p>
-    @if ($draftWorkspace)
-        <button class="action-panel-button" type="button" data-open-recipient-fields>Open recipient view</button>
-    @else
-        <button class="action-panel-button" type="button" data-open-recipient-view>Open recipient view</button>
-    @endif
-    <button class="action-panel-button" type="button" data-action-tab="receipt">Generate / view receipt</button>
+    <button class="action-panel-button" type="button" data-action-tab="receipt">Open receipt view</button>
     @if ($canPrintPdf)<a class="action-panel-button" href="{{ route('transmittals.pdf', $transmittal) }}">Print / save PDF</a>@else<button class="action-panel-button" type="button" disabled>Print / save PDF</button>@endif
     @if ($canCancelTransmittal)
-        <form method="post" action="{{ route('transmittals.cancel', $transmittal) }}" data-cancel-confirm>@csrf<input type="hidden" name="reason" value=""><button class="action-panel-button danger" type="submit">Cancel transmittal</button></form>
+        <form method="post" action="{{ route('transmittals.cancel', $transmittal) }}" data-cancel-confirm>@csrf<input type="hidden" name="reason" value=""><button class="action-panel-button danger" type="submit">Cancel</button></form>
     @else
-        <button class="action-panel-button danger" type="button" disabled>Cancel transmittal</button>
+        <button class="action-panel-button danger" type="button" disabled title="Only the draft owner with its edit token or an authorized approver can cancel this transmittal while it is still a draft, pending approval, or rejected.">Cancel</button>
     @endif
 </aside>
+
+<button class="action-panel-reopen" type="button" data-reopen-action-panel hidden>Open Action Center</button>
+
+<div class="proof-modal" data-proof-view-modal hidden>
+    <button class="proof-modal-backdrop" type="button" data-close-proof-view aria-label="Close proof details"></button>
+    <section class="proof-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="proof-view-title">
+        <header>
+            <h2 id="proof-view-title">Proof of Transmission Details</h2>
+            <button class="proof-modal-close" type="button" data-close-proof-view aria-label="Close">&times;</button>
+        </header>
+        <div class="proof-modal-fields" style="padding: 20px;">
+            <label>Type <span data-proof-view-value="proof_type"></span></label>
+            <label>Reference number <span data-proof-view-value="reference_number"></span></label>
+            <label>Recipient / receiver <span data-proof-view-value="receiver_name"></span></label>
+            <label>Recipient email <span data-proof-view-value="receiver_email"></span></label>
+            <label>Transmission method <span data-proof-view-value="channel"></span></label>
+            <label>Status <span data-proof-view-value="status"></span></label>
+            <label>Date sent / uploaded <span data-proof-view-value="transmitted_at"></span></label>
+            <label>Date acknowledged <span data-proof-view-value="acknowledged_at"></span></label>
+            <label>Sender <span data-proof-view-value="sender_name"></span></label>
+            <label>Sender position <span data-proof-view-value="sender_position"></span></label>
+            <label>Sender location <span data-proof-view-value="location"></span></label>
+            <label>Device <span data-proof-view-value="device"></span></label>
+            <label>Acknowledged by <span data-proof-view-value="acknowledged_by"></span></label>
+            <label>Evidence / source <span data-proof-view-value="source"></span><a data-proof-view-evidence hidden target="_blank" rel="noopener">Open evidence</a></label>
+            <label style="grid-column: 1 / -1;">Additional details <span data-proof-view-value="notes" style="white-space: pre-wrap; overflow-wrap: anywhere;"></span></label>
+        </div>
+    </section>
+</div>

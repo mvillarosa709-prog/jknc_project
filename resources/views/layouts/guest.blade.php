@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Sign in') · ORDO</title>
-    @vite(['resources/css/transmittal.css', 'resources/js/transmittal.js'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="guest-body">
     <a class="brand guest-brand" href="{{ route('transmittals.index') }}"><span class="brand-mark">O</span><span><strong>ORDO</strong><small>TRANSMITTAL V2</small></span></a>

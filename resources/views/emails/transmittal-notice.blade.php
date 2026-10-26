@@ -5,5 +5,5 @@
     <p><strong>{{ $transmittal->tracking_number }}</strong> — {{ $transmittal->subject }}</p>
     <p>Use the secure link below to confirm receipt. This link is private, expires in {{ config('ordo.brevo.acknowledgment_days') }} days, and should not be forwarded.</p>
     <p style="margin:28px 0"><a href="{{ $acknowledgmentUrl }}" style="background:#17644e;color:white;text-decoration:none;padding:13px 20px;border-radius:5px">Review and acknowledge receipt</a></p>
-    <p style="font-size:13px;color:#64756c">The link provides access only to the receipt form; it does not expose transmittal files. Contact the sender using your established secure channel to access the document package.</p>
+    <p style="font-size:13px;color:#64756c">The private recipient page also displays the documents attached to this transmittal for your review. This link does not provide access to other records.</p>
 </div>

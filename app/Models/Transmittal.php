@@ -3,121 +3,217 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 
 class Transmittal extends Model
 {
-    use HasFactory;
+    use SoftDeletes;
 
     protected $fillable = [
-        'transmittal_no',
+        'tracking_number',
+        'external_reference',
+        'subject',
+        'purpose',
+        'direction',
         'transmittal_date',
-        'mode',
-        'party_name',
-        'office_name',
-        'address',
+        'origin_office',
+        'recipient_address',
+        'related_company',
+        'delivery_method',
         'delivery_type',
-        'by_person_who',
-        'registered_mail_provider',
-        'electronic_method',
-        'recipient_email',
-        'action_delivery',
-        'action_pick_up',
-        'action_drop_off',
-        'action_email',
+        'delivery_actions',
         'prepared_by_name',
         'prepared_at',
         'approved_by_name',
-        'approved_position',
-        'document_custodian',
+        'operations_manager',
         'delivered_by',
         'received_by',
-        'receiver_affiliation',
-        'received_at',
-        'workflow_status',
-        'approval_status',
-        'review_note',
-        'submitted_by',
+        'processing_company',
+        'confidentiality',
+        'status',
+        'prepared_by',
         'approved_by',
         'approved_at',
+        'approved_snapshot',
+        'approval_authority_code',
+        'rejected_by',
+        'rejected_at',
+        'rejection_reason',
+        'cancelled_by',
+        'cancelled_from_status',
+        'cancelled_at',
+        'cancellation_reason',
     ];
 
-    protected $casts = [
-        'transmittal_date' => 'date',
-        'prepared_at' => 'datetime',
-        'received_at' => 'datetime',
-        'approved_at' => 'datetime',
-        'action_delivery' => 'boolean',
-        'action_pick_up' => 'boolean',
-        'action_drop_off' => 'boolean',
-        'action_email' => 'boolean',
-    ];
-
-    /**
-     * approved_by_name is the Operations Manager name written on the form.
-     * It must not be replaced by the admin user who clicks approve.
-     * The actual system approver is stored in approved_by and approved_at.
-     */
-    public function setApprovedByNameAttribute($value): void
+    protected function casts(): array
     {
-        $newValue = trim((string) ($value ?? ''));
-        $currentValue = trim((string) ($this->attributes['approved_by_name'] ?? ''));
-
-        if ($this->exists && $currentValue !== '' && $newValue !== '' && $currentValue !== $newValue) {
-            return;
-        }
-
-        $this->attributes['approved_by_name'] = $newValue !== '' ? $newValue : null;
+        return [
+            'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
+            'approved_snapshot' => 'array',
+            'transmittal_date' => 'date',
+            'delivery_actions' => 'array',
+            'prepared_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+        ];
     }
 
-    public function items()
+    public function rejector(): BelongsTo
     {
-        return $this->hasMany(TransmittalItem::class)->orderBy('item_no');
+        return $this->belongsTo(User::class, 'rejected_by');
     }
 
-    public function getFromValueAttribute(): string
+    protected static function booted(): void
     {
-        return $this->mode === 'SEND'
-            ? ($this->office_name ?? '')
-            : ($this->party_name ?? '');
+        static::updating(function (Transmittal $transmittal): void {
+            if ($transmittal->getOriginal('approved_snapshot') !== null
+                && $transmittal->isDirty([
+                    'tracking_number',
+                    'external_reference',
+                    'subject',
+                    'purpose',
+                    'direction',
+                    'transmittal_date',
+                    'origin_office',
+                    'recipient_address',
+                    'related_company',
+                    'delivery_method',
+                    'delivery_type',
+                    'delivery_actions',
+                    'prepared_by_name',
+                    'prepared_at',
+                    'approved_by_name',
+                    'operations_manager',
+                    'delivered_by',
+                    'received_by',
+                    'processing_company',
+                    'edit_token_hash',
+                    'confidentiality',
+                    'prepared_by',
+                    'approved_by',
+                    'approved_at',
+                    'approved_snapshot',
+                    'approval_authority_code',
+                    'rejected_by',
+                    'rejected_at',
+                    'rejection_reason',
+                ])) {
+                throw new LogicException('Approved transmittal details and snapshots are immutable.');
+            }
+
+            if ($transmittal->getOriginal('status') === 'rejected' && $transmittal->isDirty()) {
+                $editableFields = [
+                    'external_reference',
+                    'subject',
+                    'purpose',
+                    'direction',
+                    'transmittal_date',
+                    'origin_office',
+                    'recipient_address',
+                    'related_company',
+                    'delivery_method',
+                    'delivery_type',
+                    'delivery_actions',
+                    'operations_manager',
+                    'delivered_by',
+                    'received_by',
+                    'processing_company',
+                    'confidentiality',
+                    'prepared_by_name',
+                    'prepared_at',
+                    'edit_token_hash',
+                    'status',
+                    'cancelled_by',
+                    'cancelled_from_status',
+                    'cancelled_at',
+                    'cancellation_reason',
+                ];
+
+                if (! in_array($transmittal->status, ['rejected', 'pending_approval', 'cancelled'], true)
+                    || array_diff(array_keys($transmittal->getDirty()), $editableFields) !== []) {
+                    throw new LogicException('Rejected transmittals may only be edited when resubmitted for review.');
+                }
+            }
+
+            if ($transmittal->getOriginal('approved_snapshot') !== null && $transmittal->isDirty('status')) {
+                $allowedStatuses = match ($transmittal->getOriginal('status')) {
+                    'approved' => ['sent'],
+                    'sent' => ['acknowledged'],
+                    default => [],
+                };
+
+                if (! in_array($transmittal->status, $allowedStatuses, true)) {
+                    throw new LogicException('An approved transmittal cannot leave its delivery workflow.');
+                }
+            }
+
+            if ($transmittal->getOriginal('status') === 'cancelled' && $transmittal->isDirty('status')) {
+                throw new LogicException('Cancelled transmittals must be restored through the authorized restore action.');
+            }
+        });
+
+        static::deleting(function (Transmittal $transmittal): void {
+            if ($transmittal->isForceDeleting()
+                && ($transmittal->getOriginal('approved_snapshot') !== null
+                    || $transmittal->proofs()->exists()
+                    || $transmittal->receipts()->exists()
+                    || $transmittal->acknowledgments()->exists())) {
+                throw new LogicException('A transmittal with an approval, proof, receipt, or acknowledgment cannot be permanently deleted.');
+            }
+        });
     }
 
-    public function getToValueAttribute(): string
+    public function preparer(): BelongsTo
     {
-        return $this->mode === 'SEND'
-            ? ($this->party_name ?? '')
-            : ($this->office_name ?? '');
+        return $this->belongsTo(User::class, 'prepared_by');
     }
 
-    public function getDeliverySummaryAttribute(): string
+    public function approver(): BelongsTo
     {
-        return match ($this->delivery_type) {
-            'By Person' => $this->by_person_who ? 'By Person - ' . $this->by_person_who : 'By Person',
-            'Registered Mail' => $this->registered_mail_provider ? 'Registered Mail - ' . $this->registered_mail_provider : 'Registered Mail',
-            'Electronic' => $this->electronic_method ? 'Electronic - ' . $this->electronic_method : 'Electronic',
-            default => '',
-        };
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
-    public function getActionsSummaryAttribute(): string
+    public function recipients(): HasMany
     {
-        $actions = [];
-
-        if ($this->action_delivery) $actions[] = 'Delivery';
-        if ($this->action_pick_up) $actions[] = 'Pick Up';
-        if ($this->action_drop_off) $actions[] = 'Drop Off';
-        if ($this->action_email) $actions[] = 'Email';
-
-        return implode(', ', $actions);
+        return $this->hasMany(TransmittalRecipient::class);
     }
 
-    public function receipt()
+    public function documents(): HasMany
     {
-        return $this->hasOne(TransmittalReceipt::class);
+        return $this->hasMany(TransmittalDocument::class);
     }
 
-    public function attachments()
+    public function items(): HasMany
     {
-        return $this->hasMany(TransmittalAttachment::class)->latest();
+        return $this->hasMany(TransmittalItem::class)->orderBy('position');
+    }
+
+    public function proofs(): HasMany
+    {
+        return $this->hasMany(ProofOfTransmission::class);
+    }
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(TransmittalReceipt::class);
+    }
+
+    public function histories(): HasMany
+    {
+        return $this->hasMany(TransmittalHistory::class);
+    }
+
+    public function acknowledgments(): HasMany
+    {
+        return $this->hasMany(ExternalAcknowledgment::class);
+    }
+
+    public function authorityCode(): HasOne
+    {
+        return $this->hasOne(ApprovalAuthorityCode::class);
     }
 }

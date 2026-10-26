@@ -1,4 +1,4 @@
-@extends('layouts.transmittal')
+@extends('layouts.app')
 
 @section('title', 'Smart Upload')
 
@@ -9,20 +9,20 @@
        SMART UPLOAD ROOT & STYLES
     ============================== */
     .smart-upload-container {
-        width: 100%;
-        max-width: 1100px;
-        margin: 0 auto;
-        padding-bottom: 60px;
+        width: min(100%, 1000px);
+        min-width: 0;
+        margin-inline: auto;
+        padding-bottom: 48px;
     }
 
     .smart-upload-heading {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 18px;
+        gap: 16px;
         width: 100%;
-        margin-bottom: 22px;
-        padding: 20px 24px;
+        margin: 0 0 18px;
+        padding: 20px 22px;
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
@@ -118,21 +118,38 @@
        PANEL & TOOLBAR
     ============================== */
     .smart-panel {
+        width: 100%;
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
         padding: 24px;
-        margin-bottom: 22px;
+        margin: 0;
         box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+    }
+
+    .smart-upload-workspace {
+        max-width: none;
+    }
+
+    #smart-upload-form {
+        display: grid;
+        gap: 18px;
+        min-width: 0;
     }
 
     .panel-section-title {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 20px;
         margin-bottom: 16px;
         padding-bottom: 12px;
         border-bottom: 1px solid #f1f5f9;
+    }
+
+    .smart-upload-workspace > .panel-section-title > div:first-child {
+        min-width: 220px;
+        flex: 1 1 auto;
     }
 
     .panel-section-title h2 {
@@ -151,8 +168,8 @@
         justify-content: center;
         width: 28px;
         height: 28px;
-        background: #eff6ff;
-        color: #2563eb;
+        color: #111827;
+        background: #f1f3f7;
         border-radius: 8px;
         font-size: 14px;
     }
@@ -165,25 +182,60 @@
 
     /* Actions toolbar */
     .smart-toolbar {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-bottom: 16px;
+        gap: 8px;
+        margin-bottom: 0;
+        min-width: 0;
+        width: min(100%, 470px);
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 2px 0;
     }
 
     .btn-toolbar {
         display: inline-flex;
         align-items: center;
-        gap: 7px;
-        min-height: 36px;
-        padding: 7px 14px;
-        font-size: 12px;
+        justify-content: center;
+        gap: 4px;
+        min-height: 34px;
+        padding: 6px 7px;
+        white-space: nowrap;
+        font-size: 10px;
         font-weight: 600;
         border-radius: 8px;
         cursor: pointer;
         transition: all .15s ease;
         border: 1px solid transparent;
+    }
+
+    .smart-toolbar > .btn-toolbar {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .btn-toolbar-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        flex: 0 0 16px;
+        border-radius: 5px;
+        background: #f1f3f7;
+        color: #111827;
+    }
+
+    .btn-toolbar-icon svg {
+        display: block;
+        width: 11px;
+        height: 11px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
     }
 
     .btn-toolbar-primary {
@@ -219,7 +271,7 @@
         background: #fff;
         border-color: #fecaca;
         color: #dc2626;
-        margin-left: auto;
+        margin-left: 0;
     }
     .btn-toolbar-danger:hover {
         background: #fee2e2;
@@ -585,7 +637,9 @@
     .items-table .col-qty { width: 65px; }
     .items-table .col-desc { min-width: 160px; }
     .items-table .col-remarks { width: 130px; }
-    .items-table .col-source { width: 110px; white-space: nowrap; }
+    .items-table .col-source { width: 190px; min-width: 160px; }
+    .item-source-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
+    .item-source-file { max-width: 180px; color: #64748b; font-size: 10px; overflow-wrap: anywhere; }
     .items-table .col-action { width: 36px; text-align: center; }
 
     .file-attachment-pill {
@@ -791,13 +845,14 @@
     }
 
     /* Responsive */
-    @media (max-width: 768px) {
+    @media (max-width: 1100px) {
         .fields-grid-2 {
             grid-template-columns: minmax(0, 1fr);
         }
         .smart-upload-heading {
             flex-direction: column;
             align-items: flex-start;
+            padding: 18px;
         }
         .confirmation-banner {
             flex-direction: column;
@@ -807,6 +862,52 @@
             width: 100%;
             justify-content: flex-end;
         }
+        .smart-upload-workspace > .panel-section-title {
+            align-items: stretch;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            min-width: 0;
+        }
+        .smart-upload-workspace > .panel-section-title > div:first-child {
+            min-width: 0;
+        }
+        .smart-toolbar {
+            width: 100%;
+        }
+        .smart-upload-container .smart-panel,
+        .smart-upload-container .panel-section-title {
+            min-width: 0;
+        }
+        .smart-panel {
+            padding: 18px;
+        }
+    }
+
+    @media (max-width: 520px) {
+        .smart-upload-heading {
+            padding: 16px;
+            border-radius: 12px;
+        }
+        .smart-panel {
+            padding: 14px;
+            border-radius: 12px;
+        }
+        .smart-upload-title h1 {
+            font-size: 23px;
+        }
+        .smart-toolbar {
+            gap: 6px;
+        }
+        .smart-toolbar .btn-toolbar {
+            flex-direction: column;
+            gap: 3px;
+            min-height: 48px;
+            padding: 5px 3px;
+            white-space: normal;
+            text-align: center;
+            line-height: 1.15;
+        }
     }
 </style>
 
@@ -815,7 +916,6 @@
     {{-- HEADER --}}
     <div class="smart-upload-heading">
         <div class="smart-upload-title">
-            <span class="eyebrow">✧ High-Speed Creation Path</span>
             <h1>Smart Upload</h1>
             <p class="muted">
                 Upload or drag multiple documents, run OCR classification, detect metadata &amp; duplicates, auto-populate the items list, and review before creating your draft.
@@ -823,9 +923,6 @@
         </div>
 
         <div class="smart-upload-heading-actions">
-            <a class="btn-action" href="{{ route('transmittals.index') }}">
-                ← Back to Transmittals
-            </a>
             <a class="smart-upload-close" href="{{ route('transmittals.index') }}" aria-label="Close Smart Upload" title="Close">
                 &times;
             </a>
@@ -843,7 +940,7 @@
         data-chunk-bytes="{{ config('ordo.upload.chunk_bytes') }}"
         data-upload-analyze-url="{{ url('/transmittals/uploads') }}"
         data-analyze-url="{{ route('transmittals.analyze') }}"
-        data-max-ocr-files="{{ config('ordo.ocr.max_files', 10) }}"
+        data-max-ocr-files="{{ config('ordo.ocr.max_files', 50) }}"
     >
         @csrf
 
@@ -857,19 +954,24 @@
 
                 <div class="smart-toolbar">
                     <button type="button" class="btn-toolbar btn-toolbar-primary" id="btn-browse-trigger">
-                        📁 Browse Multiple Files
+                        <span class="btn-toolbar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7.5v-2a2 2 0 0 1 2-2h4l2 2h5"/></svg></span>
+                        Browse Multiple Files
                     </button>
                     <button type="button" class="btn-toolbar btn-toolbar-outline" id="btn-camera-trigger">
-                        📷 Take a Photo
+                        <span class="btn-toolbar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+                        Take a Photo
                     </button>
                     <button type="button" class="btn-toolbar btn-toolbar-purple" id="btn-docmgmt-trigger">
-                        🗂️ Document Management
+                        <span class="btn-toolbar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5h6l2 2h8a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-10a2 2 0 0 1 1-2z"/><path d="M8 12h8M8 15h8"/></svg></span>
+                        Document Management
                     </button>
                     <button type="button" class="btn-toolbar btn-toolbar-outline" id="btn-reanalyze" style="display: none;">
-                        ✧ Re-analyze OCR
+                        <span class="btn-toolbar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M19 12a7 7 0 1 1-2-5"/></svg></span>
+                        Re-analyze OCR
                     </button>
                     <button type="button" class="btn-toolbar btn-toolbar-danger" id="btn-clear-all" style="display: none;">
-                        🗑 Clear All
+                        <span class="btn-toolbar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-.8 13H6.8L6 7m4 4v5m4-5v5"/></svg></span>
+                        Clear All
                     </button>
                 </div>
             </div>
@@ -880,7 +982,7 @@
                 <strong>Drag &amp; drop your files here (Multiple Files Supported)</strong>
                 <span class="drop-hint">or <u>browse from your device</u> · Drop additional files anytime</span>
                 <small class="drop-limits">
-                    PDF, JPG, PNG, TIFF, DOC/DOCX · Up to {{ number_format(config('ordo.upload.max_bytes') / 1048576) }} MB per file · Up to 20 files total
+                    PDF, JPG, PNG, TIFF, DOC/DOCX · Up to {{ number_format(config('ordo.upload.max_bytes') / 1048576) }} MB per file · Up to {{ number_format(config('ordo.ocr.max_files', 50)) }} files per OCR batch
                 </small>
 
                 <input
@@ -889,8 +991,10 @@
                     id="smart-document-input"
                     multiple
                     accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx,.txt"
+                    data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}"
                 >
             </label>
+            <input type="file" id="smart-zip-input" accept=".zip,application/zip,application/x-zip-compressed" hidden>
 
             {{-- PROGRESS TRACKER --}}
             <div class="progress-container" id="upload-progress-container" style="display: none;">
@@ -960,7 +1064,7 @@
             <div class="panel-section-title">
                 <div>
                     <h2><span class="section-icon">✎</span> Transmittal Header &amp; Recipient Review</h2>
-                    <p>Auto-filled from OCR. Every field is editable and tagged with confidence/source labels.</p>
+                    <p>OCR extracted details are editable and tagged with confidence/source labels.</p>
                 </div>
             </div>
 
@@ -1087,7 +1191,7 @@
                         <label class="field-label" for="date-field">
                             Transmittal Date
                         </label>
-                        <span class="badge-confidence autofilled" id="badge-date">Auto-filled</span>
+                        <span class="badge-confidence autofilled" id="badge-date">Default date</span>
                     </div>
                     <input
                         class="field-input"
@@ -1104,7 +1208,7 @@
                         <label class="field-label" for="purpose-field">
                             Purpose / Transmittal Instructions
                         </label>
-                        <span class="badge-confidence autofilled">Auto-filled</span>
+                        <span class="badge-confidence autofilled">Default</span>
                     </div>
                     <input
                         class="field-input"
@@ -1229,6 +1333,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('smart-upload-form');
     const fileInput = document.getElementById('smart-document-input');
+    const zipInput = document.getElementById('smart-zip-input');
     const dropZone = document.getElementById('smart-dropzone');
     const browseTrigger = document.getElementById('btn-browse-trigger');
     const cameraTrigger = document.getElementById('btn-camera-trigger');
@@ -1296,7 +1401,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const uploadChunkBytes = Number(form.dataset.chunkBytes || 5242880);
-    const maxOcrFiles = Number(form.dataset.maxOcrFiles || 10);
+    const maxOcrFiles = Number(form.dataset.maxOcrFiles || 50);
+    const maxUploadBytes = Number(form.dataset.uploadMaxBytes || 52428800);
     const analyzeUrl = form.dataset.analyzeUrl || '/transmittals/analyze';
     const uploadStartUrl = form.dataset.uploadStartUrl || '/transmittals/uploads';
 
@@ -1323,7 +1429,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return existing.file.name === file.name && existing.file.size === file.size;
             });
 
-            if (!isDuplicate && selectedFiles.length < 20) {
+            if (!isDuplicate && selectedFiles.length < maxOcrFiles) {
                 selectedFiles.push({
                     file: file,
                     category: detectCategoryFromName(file.name),
@@ -1374,6 +1480,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
     fileInput.addEventListener('change', function () {
         addFiles(fileInput.files);
+    });
+
+    zipInput?.addEventListener('change', async function () {
+        const archive = zipInput.files?.[0];
+        zipInput.value = '';
+        if (!archive) return;
+        try {
+            progressStatusMsg.textContent = `Expanding ${archive.name} in this browser...`;
+            progressStatusMsg.classList.remove('error');
+            const extracted = await window.ORDOFileTools.extractArchive(archive, { maxBytes: maxUploadBytes, maxFiles: maxOcrFiles });
+            selectedFiles = selectedFiles.filter((item) => item.file.size <= maxUploadBytes);
+            syncInputFiles();
+            addFiles(extracted);
+            progressStatusMsg.textContent = `${extracted.length} supported file(s) were extracted and added to the upload queue.`;
+        } catch (error) {
+            progressStatusMsg.classList.add('error');
+            progressStatusMsg.textContent = error.message || 'The ZIP archive could not be processed.';
+        }
     });
 
     clearAllBtn.addEventListener('click', clearAllFiles);
@@ -1481,6 +1605,56 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
             `;
 
+            if (item.file.size > maxUploadBytes) {
+                const assist = document.createElement('div');
+                assist.className = 'upload-size-assist error';
+                const heading = document.createElement('strong');
+                heading.className = 'upload-limit-heading';
+                heading.textContent = 'Upload Limit Reached';
+                const message = document.createElement('p');
+                message.className = 'upload-size-message error';
+                message.setAttribute('role', 'alert');
+                message.textContent = `You've reached the maximum upload limit. Please reduce the file size or upload your documents as a supported compressed archive.`;
+                const choose = document.createElement('span');
+                choose.className = 'upload-limit-choice';
+                choose.textContent = 'Choose an option';
+                const compress = document.createElement('button');
+                compress.type = 'button';
+                compress.className = 'upload-compress-button';
+                compress.textContent = 'Compress and use';
+                compress.addEventListener('click', async function () {
+                    compress.disabled = true;
+                    message.textContent = `Compressing ${item.file.name}...`;
+                    try {
+                        const compressed = await window.ORDOFileTools.compress(item.file, maxUploadBytes);
+                        item.file = compressed;
+                        item.analysis = null;
+                        item.duplicateWarning = false;
+                        item.matchedRecord = null;
+                        item.ocrStatus = 'pending';
+                        syncInputFiles();
+                        renderQueue();
+                        updateSectionsVisibility();
+                        progressStatusMsg.classList.remove('error');
+                        triggerOcrAnalysis();
+                    } catch (error) {
+                        message.classList.add('error');
+                        message.textContent = error.message || 'The selected file could not be compressed.';
+                        compress.disabled = false;
+                    }
+                });
+                const archiveButton = document.createElement('button');
+                archiveButton.type = 'button';
+                archiveButton.className = 'upload-compress-button';
+                archiveButton.textContent = 'Upload Compressed File';
+                archiveButton.addEventListener('click', () => zipInput?.click());
+                const archiveHint = document.createElement('small');
+                archiveHint.className = 'upload-limit-archive-hint';
+                archiveHint.textContent = 'Upload supported ZIP archives to combine multiple documents into one upload.';
+                assist.append(heading, message, choose, compress, archiveButton, archiveHint);
+                card.append(assist);
+            }
+
             queueList.appendChild(card);
         });
 
@@ -1517,6 +1691,13 @@ document.addEventListener('DOMContentLoaded', function () {
     ============================================================ */
     async function triggerOcrAnalysis() {
         if (isAnalyzing || selectedFiles.length === 0) return;
+        const oversized = selectedFiles.filter((item) => item.file.size > maxUploadBytes);
+        if (oversized.length) {
+            progressContainer.style.display = 'block';
+            progressStatusMsg.className = 'progress-status-msg error';
+            progressStatusMsg.textContent = `${oversized.length} file(s) exceed the ${window.ORDOFileTools.formatSize(maxUploadBytes)} per-file maximum. Compress them from the file list before OCR.`;
+            return;
+        }
         isAnalyzing = true;
 
         progressContainer.style.display = 'block';
@@ -1594,7 +1775,7 @@ document.addEventListener('DOMContentLoaded', function () {
             progressFill.style.width = '100%';
             progressPercentage.textContent = '100%';
             progressTitle.textContent = 'Analysis Completed!';
-            progressStatusMsg.textContent = `Processed ${processed} document(s). Metadata auto-filled and review screen ready.`;
+            progressStatusMsg.textContent = `Processed ${processed} document(s). Metadata extracted and review screen ready.`;
 
             // Auto-populate header details from extracted fields
             applyExtractedHeaderFields();
@@ -1674,47 +1855,47 @@ document.addEventListener('DOMContentLoaded', function () {
         if (sub && sub.value) {
             if (!subjectInput.value || subjectInput.value === 'Smart Upload Document') {
                 subjectInput.value = sub.value;
-                setConfidenceBadge(badgeSubject, 'autofilled', 'Auto-filled · OCR');
+                setConfidenceBadge(badgeSubject, 'autofilled', 'OCR detected');
             }
         } else if (!subjectInput.value && selectedFiles.length > 0) {
             const cleanName = selectedFiles[0].file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
             subjectInput.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-            setConfidenceBadge(badgeSubject, 'autofilled', 'Auto-filled');
+            setConfidenceBadge(badgeSubject, 'autofilled', 'From filename');
         }
 
         // Reference
         const ref = findField('reference') || findField('unique_id');
         if (ref && ref.value && !referenceInput.value) {
             referenceInput.value = ref.value;
-            setConfidenceBadge(badgeReference, 'autofilled', 'Auto-filled · OCR');
+            setConfidenceBadge(badgeReference, 'autofilled', 'OCR detected');
         }
 
         // Company
         const comp = findField('company');
         if (comp && comp.value && !companyInput.value) {
             companyInput.value = comp.value;
-            setConfidenceBadge(badgeCompany, 'autofilled', 'Auto-filled · OCR');
+            setConfidenceBadge(badgeCompany, 'autofilled', 'OCR detected');
         }
 
         // Address
         const addr = findField('recipient_address');
         if (addr && addr.value && !addressInput.value) {
             addressInput.value = addr.value;
-            setConfidenceBadge(badgeAddress, 'autofilled', 'Auto-filled · OCR');
+            setConfidenceBadge(badgeAddress, 'autofilled', 'OCR detected');
         }
 
         // Recipient Name
         const recName = findField('recipient_name');
         if (recName && recName.value && !recipientNameInput.value) {
             recipientNameInput.value = recName.value;
-            setConfidenceBadge(badgeRecipientName, 'autofilled', 'Auto-filled · OCR');
+            setConfidenceBadge(badgeRecipientName, 'autofilled', 'OCR detected');
         }
 
         // Recipient Email
         const recEmail = findField('recipient_email');
         if (recEmail && recEmail.value && !recipientEmailInput.value) {
             recipientEmailInput.value = recEmail.value;
-            setConfidenceBadge(badgeRecipientEmail, 'autofilled', 'Auto-filled · High');
+            setConfidenceBadge(badgeRecipientEmail, 'autofilled', 'OCR - High');
         }
     }
 
@@ -1762,13 +1943,13 @@ document.addEventListener('DOMContentLoaded', function () {
             const uniqueId = fields.unique_id || fields.reference || '';
             const qty = '1';
             const desc = fields.description || `${item.category.charAt(0).toUpperCase() + item.category.slice(1)} attachment (${item.file.name})`;
-            const remarks = item.ocrStatus === 'completed' ? 'Auto-filled from OCR' : 'Attached from Smart Upload';
+            const remarks = item.ocrStatus === 'completed' ? 'OCR detected' : 'Attached from Smart Upload';
 
-            let sourceBadge = '<span class="badge-confidence review">Review</span>';
+            let sourceLabel = 'Needs review';
+            let sourceClass = 'review';
             if (item.ocrStatus === 'completed') {
-                sourceBadge = item.matchedRecord
-                    ? '<span class="badge-confidence matched">Matched</span>'
-                    : '<span class="badge-confidence ocr">OCR · High</span>';
+                sourceLabel = item.matchedRecord ? 'Matched record' : 'Extracted by OCR';
+                sourceClass = item.matchedRecord ? 'matched' : 'ocr';
             }
 
             addItemRowElement({
@@ -1780,7 +1961,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 qty: qty,
                 desc: desc,
                 remarks: remarks,
-                sourceBadge: sourceBadge
+                sourceLabel: sourceLabel,
+                sourceClass: sourceClass,
+                sourceFileName: item.file.name
             });
         });
     }
@@ -1813,13 +1996,37 @@ document.addEventListener('DOMContentLoaded', function () {
             <td class="col-remarks">
                 <input type="text" name="items[${rowIndex}][remarks]" value="${data.remarks || 'User reviewed'}" placeholder="Remarks">
             </td>
-            <td class="col-source">
-                ${data.sourceBadge || '<span class="badge-confidence autofilled">Manual</span>'}
-            </td>
+            <td class="col-source"><div class="item-source-cell"></div></td>
             <td class="col-action">
                 <button type="button" class="btn-remove-file" title="Delete row" style="font-size: 14px;">&times;</button>
             </td>
         `;
+
+
+        // Awtomatikong i-attach ang file galing sa selectedFiles gamit ang DataTransfer API
+        if (data.docIndex !== undefined && selectedFiles[data.docIndex]) {
+            const fileInputElem = row.querySelector('.item-file-input');
+            const targetFile = selectedFiles[data.docIndex].file;
+            if (fileInputElem && targetFile instanceof File) {
+                const dt = new DataTransfer();
+                dt.items.add(targetFile);
+                fileInputElem.files = dt.files;
+            }
+        }
+        
+        const sourceCell = row.querySelector('.item-source-cell');
+        const sourceBadge = document.createElement('span');
+        sourceBadge.className = `badge-confidence ${['ocr', 'matched', 'review', 'autofilled'].includes(data.sourceClass) ? data.sourceClass : 'autofilled'}`;
+        sourceBadge.textContent = data.sourceLabel || 'Manual';
+        sourceCell.appendChild(sourceBadge);
+
+        if (data.sourceFileName) {
+            const sourceFile = document.createElement('small');
+            sourceFile.className = 'item-source-file';
+            sourceFile.textContent = `OCR source file: ${data.sourceFileName}`;
+            sourceFile.title = data.sourceFileName;
+            sourceCell.appendChild(sourceFile);
+        }
 
         // Row deletion
         row.querySelector('.col-action button').addEventListener('click', function () {
@@ -1849,7 +2056,9 @@ document.addEventListener('DOMContentLoaded', function () {
             qty: '1',
             desc: '',
             remarks: 'Manually added item',
-            sourceBadge: '<span class="badge-confidence autofilled">User Added</span>'
+            sourceLabel: 'User added',
+            sourceClass: 'autofilled',
+            sourceFileName: ''
         });
     });
 
@@ -2005,6 +2214,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (selectedFiles.length === 0) {
             e.preventDefault();
             alert('Please upload or drag at least one document before submitting.');
+            return;
+        }
+
+        const oversized = selectedFiles.filter((item) => item.file.size > maxUploadBytes);
+        if (oversized.length) {
+            e.preventDefault();
+            alert(`${oversized.length} file(s) exceed the ${window.ORDOFileTools.formatSize(maxUploadBytes)} per-file maximum. Use Compress and use or select smaller files.`);
+            renderQueue();
             return;
         }
 

@@ -1,4 +1,4 @@
-@extends('layouts.transmittal')
+@extends('layouts.app')
 
 @section('title', 'Transmittals')
 

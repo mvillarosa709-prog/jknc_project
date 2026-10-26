@@ -1,4 +1,4 @@
-@extends('layouts.transmittal')
+@extends('layouts.app')
 
 @section('title', $transmittal->tracking_number)
 @section('eyebrow', $transmittal->tracking_number)
@@ -117,7 +117,7 @@
 </div>
         <div class="tab-content" id="tab-attachments">
             <div class="section-title tab-title"><span class="step-number">04</span><div><h2>Attachments</h2><p class="muted">Private source documents are available to authorized workspace users and recipients with a valid secure link.</p></div></div>
-            @if ($canViewPrivateFiles)
+            @if ($canViewAttachments)
                 <div class="attachment-list">@forelse ($transmittal->documents as $document)<a class="attachment-row" href="{{ route('transmittals.documents.download', [$transmittal, $document]) }}"><span class="file-type">{{ strtoupper(pathinfo($document->original_name, PATHINFO_EXTENSION)) }}</span><span class="attachment-copy"><strong>{{ $document->original_name }}</strong><small>{{ ucfirst($document->category) }} Â· {{ number_format($document->size_bytes / 1024, 1) }} KB Â· SHA-256 {{ substr($document->sha256, 0, 16) }}â€¦</small></span><span class="download-mark">â†“</span></a>@empty<div class="empty-inline">There are no attachments on this transmittal.</div>@endforelse</div>
             @else
                 <div class="empty-inline">Attachments are private. Use the recipient link from the notification or sign in to an authorized workspace.</div>

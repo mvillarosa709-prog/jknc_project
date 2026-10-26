@@ -51,7 +51,7 @@
             </div>
         @endif
     </header>
-    <form method="post" action="{{ $isEditing ? route('transmittals.update', $transmittal) : route('transmittals.store') }}" enctype="multipart/form-data" id="transmittal-form" class="drawer-form">
+    <form method="post" action="{{ $isEditing ? route('transmittals.update', $transmittal) : route('transmittals.store') }}" enctype="multipart/form-data" id="transmittal-form" class="drawer-form" data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}" data-upload-start-url="{{ route('transmittals.uploads.start') }}" data-chunk-bytes="{{ config('ordo.upload.chunk_bytes') }}">
         @csrf
         @if ($isEditing) @method('PUT') @endif
         <div class="drawer-body">
@@ -68,6 +68,11 @@
                     <small>Update this record and resubmit under {{ $transmittal->tracking_number }}.</small>
                 </div>
             @endif
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb;">
+    <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827;">{{ $isEditing ? 'Edit Transmittal' : 'Add Transmittal' }}</h3>
+    <button type="button" data-close-drawer style="background: none; border: none; font-size: 18px; color: #6b7280; cursor: pointer; padding: 0;">&times;</button>
+</div>
             <label>Ref #
                 <input value="{{ $isEditing ? $transmittal->tracking_number : 'AUTO-INCREMENT' }}" readonly aria-label="Reference number">
             </label>
@@ -198,7 +203,7 @@
                             <label>Description<input name="items[{{ $index }}][description]" value="{{ $item['description'] ?? '' }}" maxlength="2000" placeholder="Description"></label>
                             <label>Remarks<input name="items[{{ $index }}][remarks]" value="{{ $item['remarks'] ?? '' }}" maxlength="2000" placeholder="Remarks"></label>
                             <label>Upload File
-                                <input type="file" name="items[{{ $index }}][attachment]" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-file-name-target>
+                                <input type="file" name="items[{{ $index }}][attachment]" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-file-name-target data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}">
                                 <small class="file-selection-name">No file selected</small>
                             </label>
                         </fieldset>
@@ -216,7 +221,7 @@
                         <label>Description<input name="items[0][description]" maxlength="2000" placeholder="Description"></label>
                         <label>Remarks<input name="items[0][remarks]" maxlength="2000" placeholder="Remarks"></label>
                         <label>Upload File
-                            <input type="file" name="items[0][attachment]" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-file-name-target>
+                            <input type="file" name="items[0][attachment]" accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-file-name-target data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}">
                             <small class="file-selection-name">No file selected</small>
                         </label>
                     </fieldset>
@@ -231,7 +236,7 @@
                             @endforeach
                         </div>
                     @endif
-                    <input type="file" name="supporting_attachments[]" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-supporting-attachments>
+                    <input type="file" name="supporting_attachments[]" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-supporting-attachments data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}">
                     <small class="file-selection-name" data-supporting-file-names>No file selected</small>
                     <p class="field-hint">You may upload multiple supporting files. These will be attached when using Send Email.</p>
                 </section>
@@ -305,8 +310,9 @@
                     <label class="drop-zone" id="drop-zone" for="document-input">
                         <span class="upload-icon">↑</span><strong>Drop your files here</strong><span>or <u>browse files</u></span>
                         <small>PDF, images, DOCX · up to 20 MB each</small>
-                        <input type="file" name="documents[]" id="document-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx">
+                        <input type="file" name="documents[]" id="document-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}">
                     </label>
+                    <input type="file" id="transmittal-zip-input" accept=".zip,application/zip,application/x-zip-compressed" hidden>
                     <div class="upload-controls">
                         <button class="button subtle" type="button" id="analyze-files" data-max-files="{{ config('ordo.ocr.max_files') }}" data-analyze-url="{{ route('transmittals.analyze') }}" disabled>✧ Classify &amp; extract</button>
                         <span class="field-hint">OCR uses the configured server tools.</span>
