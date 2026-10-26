@@ -18,13 +18,6 @@
                 Back
             </a>
 
-            <button
-                class="button primary"
-                type="button"
-                id="send-transmittal-email"
-            >
-                Send Email
-            </button>
         </div>
     </div>
 
@@ -63,13 +56,12 @@
 
  {{-- DRAFT OF TRANSMITTAL --}}
 <div class="tab-content active" id="tab-draft">
-    <div class="draft-workspace-layout" style="display: flex; gap: 20px; align-items: flex-start;">
+    <div class="draft-workspace-layout">
 
         {{-- Kaliwa: Document Preview --}}
         <section
             class="document-preview-pane draft-preview-pane"
             aria-label="Draft document preview"
-            style="flex: 1; width: 50%;"
         >
             <div class="preview-pane-header">
                 <span>DOCUMENT PREVIEW</span>
@@ -84,7 +76,7 @@
         </section>
 
         {{-- Kanan: Editable Draft Form --}}
-        <div class="draft-information-cards" style="flex: 1; width: 50%;">
+        <div class="draft-information-cards">
             @php
                 $latestReceipt = $transmittal->receipts
                     ->sortByDesc('received_at')
@@ -341,7 +333,9 @@
                         {{-- Delivery Actions --}}
                         <div>
                             <label style="display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px;">Actions</label>
-                            @php($selectedActions = old('delivery_actions', $transmittal->delivery_actions ?? ['email']))
+                            @php
+                                $selectedActions = old('delivery_actions', $transmittal->delivery_actions ?? ['email']);
+                            @endphp
                             <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px;">
                                 @foreach (['delivery' => 'Delivery', 'pick_up' => 'Pick Up', 'drop_off' => 'Drop Off', 'email' => 'Email'] as $value => $label)
                                     <label><input type="checkbox" name="delivery_actions[]" value="{{ $value }}" {{ in_array($value, $selectedActions, true) ? 'checked' : '' }}> {{ $label }}</label>
@@ -554,24 +548,47 @@
                 </div>
 
                 {{-- BOXED ITEM FILE UPLOAD --}}
-                <div style="margin-bottom: 4px;">
-                    <label style="display: block; font-size: 12px; font-weight: 500; color: #374151; margin-bottom: 6px;">
-                        Upload File
-                    </label>
+    <div style="margin-bottom: 4px;">
+        <label style="display: block; font-size: 12px; font-weight: 500; color: #374151; margin-bottom: 6px;">
+            Upload File
+        </label>
+        <div style="width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; background: #ffffff;">
+           @php
+                $itemObj = is_array($item) ? (object)$item : $item;
+                $matchedDoc = null;
+                
+                // 1. Hanapin gamit ang document_id kung meron man
+                if (isset($itemObj->document_id) && $itemObj->document_id) {
+                    $matchedDoc = $transmittal->documents->firstWhere('id', $itemObj->document_id);
+                }
+                
+                // 2. Fallback: Kunin ang dokumento base sa index o kunin ang pinakauna kung galing Smart Upload
+                if (!$matchedDoc && $transmittal->documents->count() > 0) {
+                    $matchedDoc = $transmittal->documents->get($index) ?? $transmittal->documents->first();
+                }
+                
+                $attachedFileName = $matchedDoc?->original_name ?? $itemObj?->attachment_name ?? null;
+            @endphp
 
-                    <div style="width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; background: #ffffff;">
-                        <input
-                            type="file"
-                            name="items[{{ $index }}][attachment]"
-                            accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx"
-                            style="display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; border: 0; padding: 0; margin: 0; background: transparent; color: #8495ad; font-size: 12px;"
-                        >
-                    </div>
-
-                    <small style="color: #6b7280; font-size: 11px; display: block; margin-top: 5px;">
-                        Select a file for this item.
-                    </small>
+            @if ($attachedFileName)
+                <div style="font-size: 12px; color: #0f172a; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span>📎</span>
+                    <strong>{{ $attachedFileName }}</strong>
                 </div>
+            @endif
+
+<input
+    type="file"
+    name="items[{{ $index }}][attachments][]"
+    multiple
+    accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx"
+    style="display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; border: 0; padding: 0; margin: 0; background: transparent; color: #8495ad; font-size: 12px;"
+>
+        </div>
+        <small style="color: #6b7280; font-size: 11px; display: block; margin-top: 5px;">
+            {{ $attachedFileName ? 'Choose a new file to replace the current attachment.' : 'Select a file for this item.' }}
+        </small>
+    </div>
             </fieldset>
         @endforeach
     </div>
@@ -589,6 +606,7 @@
             name="supporting_attachments[]"
             multiple
             accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx"
+            data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}"
             style="display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; border: 0; padding: 0; margin: 0; background: transparent; color: #8495ad; font-size: 12px;"
         >
     </div>
@@ -728,6 +746,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 hasContent = true;
             }
 
+const fileDisplay = row.querySelector('strong');
+            let fileName = '—';
+            if (fileDisplay && fileDisplay.textContent) {
+                fileName = fileDisplay.textContent.trim();
+            }
+
             html += `
                 <tr>
                     <td>${index + 1}</td>
@@ -736,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <td>${quantity}</td>
                     <td>${description}</td>
                     <td>${remarks}</td>
-                    <td>—</td>
+                    <td>${fileName}</td>
                 </tr>
             `;
         });
@@ -1060,34 +1084,59 @@ document.addEventListener('DOMContentLoaded', function () {
                         </div>
                     </div>
 
-                    <div class="attachment-list">
-                        @forelse ($transmittal->documents as $document)
-                            <a
-                                class="attachment-row"
-                                href="{{ route('transmittals.documents.download', [$transmittal, $document]) }}"
-                            >
-                                <span class="file-type">
-                                    {{ strtoupper(pathinfo($document->original_name, PATHINFO_EXTENSION)) }}
-                                </span>
-
-                                <span class="attachment-copy">
-                                    <strong>{{ $document->original_name }}</strong>
-
-                                    <small>
-                                        {{ ucfirst($document->category) }}
-                                        ·
-                                        {{ number_format($document->size_bytes / 1024, 1) }} KB
-                                    </small>
-                                </span>
-
-                                <span class="download-mark">↓</span>
-                            </a>
-                        @empty
-                            <div class="empty-inline">
-                                No uploaded attachments.
-                            </div>
-                        @endforelse
-                    </div>
+                    @if ($transmittal->documents->isNotEmpty())
+                        @php
+                            $initialAttachment = $transmittal->documents->first();
+                            $initialExtension = strtolower(pathinfo($initialAttachment->original_name, PATHINFO_EXTENSION));
+                            $initialMime = strtolower($initialAttachment->mime_type ?: '');
+                            $initialPreviewable = in_array($initialMime, ['application/pdf', 'text/plain'], true)
+                                || (str_starts_with($initialMime, 'image/') && ! in_array($initialExtension, ['tif', 'tiff'], true))
+                                || in_array($initialExtension, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt'], true);
+                            $initialUrl = route('transmittals.documents.download', [$transmittal, $initialAttachment]);
+                            $initialPreviewUrl = $initialUrl.($initialExtension === 'pdf' ? '#view=FitH&navpanes=0' : '');
+                        @endphp
+                        @if ($canViewPrivateFiles ?? false)
+                        <div class="attachment-browser-layout" data-attachment-browser>
+                            <aside class="attachment-browser" aria-label="Uploaded attachments">
+                                <h3>Attachments <span>{{ $transmittal->documents->count() }}</span></h3>
+                                <div class="attachment-browser-list">
+                                    @foreach ($transmittal->documents as $document)
+                                        @php
+                                            $extension = strtolower(pathinfo($document->original_name, PATHINFO_EXTENSION));
+                                            $mime = strtolower($document->mime_type ?: '');
+                                            $previewable = in_array($mime, ['application/pdf', 'text/plain'], true)
+                                                || (str_starts_with($mime, 'image/') && ! in_array($extension, ['tif', 'tiff'], true))
+                                                || in_array($extension, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt'], true);
+                                            $url = route('transmittals.documents.download', [$transmittal, $document]);
+                                            $previewUrl = $url.($extension === 'pdf' ? '#view=FitH&navpanes=0' : '');
+                                        @endphp
+                                        <button class="attachment-browser-item" type="button" data-attachment-select
+                                            data-attachment-url="{{ $url }}" data-attachment-fit-url="{{ $previewUrl }}"
+                                            data-attachment-name="{{ $document->original_name }}"
+                                            data-attachment-category="{{ str($document->category)->replace('_', ' ')->title() }}"
+                                            data-attachment-previewable="{{ $previewable ? 'true' : 'false' }}"
+                                            aria-pressed="{{ $loop->first ? 'true' : 'false' }}">
+                                            <span class="file-type">{{ strtoupper($extension ?: 'FILE') }}</span>
+                                            <span class="attachment-copy"><strong>{{ $document->original_name }}</strong><small>{{ str($document->category)->replace('_', ' ')->title() }}</small></span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </aside>
+                            <section class="attachment-preview" aria-label="Attachment preview">
+                                <header class="attachment-preview-heading">
+                                    <div><h3 data-attachment-preview-title>{{ $initialAttachment->original_name }}</h3><p data-attachment-preview-category>{{ str($initialAttachment->category)->replace('_', ' ')->title() }}</p></div>
+                                    <button class="button subtle attachment-expand-button" type="button" data-expand-attachment-preview aria-pressed="false">Expand Preview</button>
+                                </header>
+                                <div class="attachment-preview-stage">
+                                    <iframe data-attachment-frame title="{{ $initialAttachment->original_name }}" src="{{ $initialPreviewUrl }}" @if (! $initialPreviewable) hidden @endif></iframe>
+                                    <p data-attachment-unavailable @if ($initialPreviewable) hidden @endif>This file format cannot be previewed in the browser. Download it to open the document.</p>
+                                </div>
+                            </section>
+                        </div>
+                        @endif
+                    @else
+                        <div class="empty-inline">No uploaded attachments.</div>
+                    @endif
                 </div>
 
                 {{-- HISTORY --}}

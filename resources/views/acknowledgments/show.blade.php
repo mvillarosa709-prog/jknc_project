@@ -23,7 +23,25 @@
     <section class="ack-summary">
         <span class="eyebrow">PRIVATE ATTACHMENTS</span>
         @forelse ($recipient->transmittal->documents as $document)
-            <p><a href="{{ route('acknowledgments.documents.download', ['token' => request()->route('token'), 'document' => $document->id]) }}">{{ $document->original_name }}</a></p>
+            @php
+                $attachmentMime = strtolower($document->mime_type ?: '');
+                $attachmentExtension = strtolower(pathinfo($document->original_name, PATHINFO_EXTENSION));
+                $attachmentPreviewable = in_array($attachmentMime, ['application/pdf', 'text/plain'], true)
+                    || str_starts_with($attachmentMime, 'image/') && ! in_array($attachmentExtension, ['tif', 'tiff'], true)
+                    || in_array($attachmentExtension, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'txt'], true);
+            @endphp
+            <article class="recipient-attachment-preview">
+                <h2>{{ $document->original_name }}</h2>
+                @if ($attachmentPreviewable)
+                    <iframe
+                        title="{{ $document->original_name }}"
+                        src="{{ route('acknowledgments.documents.download', ['token' => request()->route('token'), 'document' => $document->id]) }}"
+                        loading="eager"
+                    ></iframe>
+                @else
+                    <p>This file format cannot be displayed inline by the browser. Please contact the sender for a PDF or image copy.</p>
+                @endif
+            </article>
         @empty
             <p>No files were attached to this transmittal.</p>
         @endforelse

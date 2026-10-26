@@ -23,11 +23,11 @@ class AuthController extends Controller
         ]);
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))
-            || ! Auth::user()?->canApproveTransmittals()) {
+            || ! in_array(Auth::user()?->transmittal_role, ['administrator', 'preparer', 'client'], true)) {
             Auth::logout();
 
             throw ValidationException::withMessages([
-                'email' => 'Those credentials do not match an administrator account.',
+                'email' => 'Those credentials do not match an active ORDO account.',
             ]);
         }
 

@@ -13,11 +13,11 @@ return [
         'C:\\Users\\Admin\\Downloads\\poppler-26.09.0\\Library\\bin\\pdftoppm.exe'
     ),
     'timeout' => (int) env('ORDO_OCR_TIMEOUT', 30),
-    'max_files' => (int) env('ORDO_OCR_MAX_FILES', 10),
+    'max_files' => (int) env('ORDO_OCR_MAX_FILES', 50),
 ],
 
     'upload' => [
-        'max_bytes' => (int) env('ORDO_UPLOAD_MAX_BYTES', 1073741824),
+        'max_bytes' => (int) env('ORDO_UPLOAD_MAX_BYTES', 52428800),
         'chunk_bytes' => (int) env('ORDO_UPLOAD_CHUNK_BYTES', 5242880),
         'expiry_hours' => (int) env('ORDO_UPLOAD_EXPIRY_HOURS', 24),
         'completion_lock_seconds' => (int) env('ORDO_UPLOAD_COMPLETION_LOCK_SECONDS', 3600),

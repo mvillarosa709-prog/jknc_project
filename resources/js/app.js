@@ -1,4 +1,305 @@
+import { PDFDocument } from 'pdf-lib';
+import { Unzip, UnzipInflate, UnzipPassThrough } from 'fflate';
+
+const formatUploadSize = (bytes) => {
+    if (bytes >= 1024 ** 3) return `${(bytes / (1024 ** 3)).toFixed(1)} GB`;
+    if (bytes >= 1024 ** 2) return `${(bytes / (1024 ** 2)).toFixed(0)} MB`;
+    return `${(bytes / 1024).toFixed(0)} KB`;
+};
+
+const compressUploadFile = async (file, maxBytes) => {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (extension === 'pdf' || file.type === 'application/pdf') {
+        try {
+            const document = await PDFDocument.load(await file.arrayBuffer());
+            const bytes = await document.save({ useObjectStreams: true, addDefaultPage: false });
+            if (bytes.byteLength >= maxBytes || bytes.byteLength >= file.size) {
+                throw new Error('The PDF could not be reduced below the maximum size. It may already be compressed.');
+            }
+            return new File([bytes], file.name, { type: 'application/pdf', lastModified: file.lastModified });
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('could not be reduced')) throw error;
+            throw new Error('This PDF could not be compressed in the browser. Choose a smaller or unencrypted PDF.');
+        }
+    }
+
+    const isImage = file.type.startsWith('image/') || ['jpg', 'jpeg', 'png', 'tif', 'tiff'].includes(extension);
+    if (!isImage) throw new Error('Automatic compression is available for PDF and image files. This file type must be reduced with another tool.');
+
+    let bitmap;
+    try {
+        bitmap = await createImageBitmap(file);
+    } catch {
+        throw new Error('This image format cannot be compressed by this browser. Choose a smaller file or convert it to JPG or PNG.');
+    }
+
+    const keepPng = extension === 'png';
+    const outputType = keepPng ? 'image/png' : 'image/jpeg';
+    const outputExtension = keepPng ? 'png' : 'jpg';
+    const baseName = file.name.replace(/\.[^.]+$/, '');
+    let smallestBlob = null;
+
+    try {
+        for (const scale of [1, 0.85, 0.7, 0.58, 0.5]) {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+            canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Image compression is unavailable in this browser.');
+            if (outputType === 'image/jpeg') {
+                context.fillStyle = '#fff';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+            const qualities = outputType === 'image/jpeg' ? [0.88, 0.78, 0.68, 0.58] : [undefined];
+            for (const quality of qualities) {
+                const blob = await new Promise((resolve) => canvas.toBlob(resolve, outputType, quality));
+                if (!blob) continue;
+                if (!smallestBlob || blob.size < smallestBlob.size) smallestBlob = blob;
+                if (blob.size < maxBytes && blob.size < file.size) {
+                    return new File([blob], `${baseName}.${outputExtension}`, { type: outputType, lastModified: file.lastModified });
+                }
+            }
+        }
+    } finally {
+        bitmap.close?.();
+    }
+
+    if (!smallestBlob || smallestBlob.size >= file.size || smallestBlob.size >= maxBytes) {
+        throw new Error('The image could not be reduced below the maximum while keeping it readable.');
+    }
+
+    return new File([smallestBlob], `${baseName}.${outputExtension}`, { type: outputType, lastModified: file.lastModified });
+};
+
+const extractUploadArchive = async (archive, { maxBytes, maxFiles = 50, maxTotalBytes = maxBytes * 5 } = {}) => {
+    if (!archive.name.toLowerCase().endsWith('.zip')) throw new Error('Choose a supported .zip archive.');
+    if (archive.size > maxBytes) throw new Error(`The ZIP archive exceeds the ${formatUploadSize(maxBytes)} upload limit.`);
+    const supported = new Set(['pdf', 'jpg', 'jpeg', 'png', 'tif', 'tiff', 'doc', 'docx', 'txt']);
+    const mimeTypes = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', tif: 'image/tiff', tiff: 'image/tiff', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', txt: 'text/plain' };
+    const extracted = [];
+    const tasks = [];
+    let totalBytes = 0;
+    let fileCount = 0;
+    let failure = null;
+    const unzip = new Unzip((entry) => {
+        if (failure || entry.name.endsWith('/')) return;
+        const name = entry.name.split(/[\\/]/).pop();
+        if (!name || name.startsWith('.') || entry.name.split(/[\\/]/).includes('__MACOSX')) return;
+        const extension = name.split('.').pop()?.toLowerCase();
+        if (!supported.has(extension)) return;
+        fileCount += 1;
+        if (fileCount > maxFiles) { failure = new Error(`The ZIP contains more than ${maxFiles} supported files. Split it into smaller uploads.`); return; }
+        if (!Number.isFinite(entry.originalSize) || entry.originalSize > maxBytes || totalBytes + entry.originalSize > maxTotalBytes) {
+            failure = new Error('The uncompressed files exceed the safe upload size limit. Use a smaller ZIP archive.');
+            return;
+        }
+        totalBytes += entry.originalSize;
+        let received = 0;
+        const chunks = [];
+        const task = new Promise((resolve, reject) => {
+            entry.ondata = (error, chunk, final) => {
+                if (error) { reject(error); return; }
+                received += chunk.byteLength;
+                if (received > maxBytes || received > entry.originalSize) { reject(new Error(`${name} exceeds the per-file upload limit.`)); return; }
+                chunks.push(chunk);
+                if (final) resolve(new File(chunks, name, { type: mimeTypes[extension] || 'application/octet-stream', lastModified: Date.now() }));
+            };
+        });
+        tasks.push(task);
+        entry.start();
+    });
+    unzip.register(UnzipInflate);
+    unzip.register(UnzipPassThrough);
+    try {
+        unzip.push(new Uint8Array(await archive.arrayBuffer()), true);
+        if (failure) throw failure;
+        extracted.push(...await Promise.all(tasks));
+    } catch (error) {
+        throw new Error(error.message || 'The ZIP archive could not be read.');
+    }
+    if (!extracted.length) throw new Error('No supported documents were found in the ZIP archive.');
+    return extracted;
+};
+
+window.ORDOFileTools = { ...(window.ORDOFileTools || {}), extractArchive: extractUploadArchive };
+
+window.ORDOFileTools = { ...(window.ORDOFileTools || {}), compress: compressUploadFile, formatSize: formatUploadSize };
+
+const getUploadSizeControl = (input) => {
+    if (input.dataset.uploadSizeControl) return input._uploadSizeControl;
+
+    const limit = Number(input.dataset.uploadMaxBytes || 0);
+    if (!limit) return null;
+    const container = document.createElement('div');
+    container.className = 'upload-size-assist';
+    const message = document.createElement('p');
+    message.className = 'upload-size-message';
+    message.textContent = `Maximum file size: ${formatUploadSize(limit)} per file.`;
+    message.setAttribute('role', 'status');
+    message.setAttribute('aria-live', 'polite');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'upload-compress-button';
+    button.textContent = 'Compress and use';
+    button.hidden = true;
+    container.append(message, button);
+    let archiveInput = null;
+    let archiveButton = null;
+    if (input.multiple) {
+        archiveInput = document.createElement('input');
+        archiveInput.type = 'file';
+        archiveInput.accept = '.zip,application/zip,application/x-zip-compressed';
+        archiveInput.hidden = true;
+        archiveButton = document.createElement('button');
+        archiveButton.type = 'button';
+        archiveButton.className = 'upload-compress-button';
+        archiveButton.textContent = 'Upload Compressed File';
+        archiveButton.hidden = true;
+        container.append(archiveButton, archiveInput);
+        archiveButton.addEventListener('click', () => archiveInput.click());
+        archiveInput.addEventListener('change', async () => {
+            const archive = archiveInput.files?.[0];
+            archiveInput.value = '';
+            if (!archive) return;
+            try {
+                message.classList.remove('error');
+                message.textContent = `Expanding ${archive.name} in this browser...`;
+                const files = await extractUploadArchive(archive, { maxBytes: limit, maxFiles: 50 });
+                const transfer = new DataTransfer();
+                [...(input.files || [])].filter((file) => file.size <= limit).concat(files).forEach((file) => transfer.items.add(file));
+                input.files = transfer.files;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                message.textContent = `${files.length} files were extracted and added to the upload selection.`;
+            } catch (error) {
+                message.classList.add('error');
+                message.textContent = error.message || 'The ZIP archive could not be processed.';
+            }
+        });
+    }
+    input.insertAdjacentElement('afterend', container);
+    input.dataset.uploadSizeControl = 'true';
+    input._uploadSizeControl = { limit, container, message, button, archiveButton };
+
+    button.addEventListener('click', async () => {
+        const files = [...(input.files || [])];
+        const oversized = files.map((file, index) => ({ file, index })).filter(({ file }) => file.size > limit);
+        if (!oversized.length) return;
+
+        button.disabled = true;
+        message.classList.remove('error');
+        message.textContent = `Compressing ${oversized.length} file(s)…`;
+        try {
+            const replacements = new Map();
+            for (const { file, index } of oversized) replacements.set(index, await compressUploadFile(file, limit));
+            const transfer = new DataTransfer();
+            files.forEach((file, index) => transfer.items.add(replacements.get(index) || file));
+            input.files = transfer.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            const saved = oversized.reduce((total, { file, index }) => total + file.size - replacements.get(index).size, 0);
+            const current = input._uploadSizeControl;
+            current.message.textContent = `Compressed successfully. Reduced by ${formatUploadSize(saved)}; files are ready to upload.`;
+            current.message.classList.remove('error');
+            current.button.hidden = true;
+        } catch (error) {
+            message.classList.add('error');
+            message.textContent = error.message || 'The selected file could not be compressed.';
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    return input._uploadSizeControl;
+};
+
+document.addEventListener('change', (event) => {
+    const input = event.target.closest?.('input[type="file"][data-upload-max-bytes]');
+    if (!input || ['document-input', 'smart-document-input'].includes(input.id)) return;
+    const control = getUploadSizeControl(input);
+    if (!control) return;
+    const oversized = [...(input.files || [])].filter((file) => file.size > control.limit);
+    control.button.hidden = oversized.length === 0;
+    if (control.archiveButton) control.archiveButton.hidden = oversized.length === 0;
+    control.message.classList.toggle('error', oversized.length > 0);
+    control.message.textContent = oversized.length
+        ? `Upload Limit Reached. You've reached the maximum upload limit. Please reduce the file size or upload your documents as a supported compressed archive. Choose an option.`
+        : `Maximum file size: ${formatUploadSize(control.limit)} per file.`;
+});
+
+document.querySelectorAll('#transmittal-form, #smart-upload-form').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+        const invalidInput = [...form.querySelectorAll('input[type="file"][data-upload-max-bytes]')]
+            .filter((input) => !['document-input', 'smart-document-input'].includes(input.id))
+            .find((input) => [...(input.files || [])].some((file) => file.size > Number(input.dataset.uploadMaxBytes)));
+        if (!invalidInput) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const control = getUploadSizeControl(invalidInput);
+        if (control) {
+            control.message.classList.add('error');
+            control.message.textContent = `Maximum file size is ${formatUploadSize(control.limit)}. Compress the oversized file or choose a smaller one.`;
+            control.button.hidden = false;
+        }
+        invalidInput.focus({ preventScroll: true });
+    }, true);
+});
+
 const tabs = document.querySelectorAll('[data-tab]');
+const actionPanel = document.querySelector('[data-action-panel]');
+const reopenActionPanel = document.querySelector('[data-reopen-action-panel]');
+document.querySelectorAll('[data-close-action-panel]').forEach((button) => button.addEventListener('click', () => {
+    if (!actionPanel) return;
+    actionPanel.dataset.dismissed = 'true';
+    actionPanel.hidden = true;
+    if (reopenActionPanel) reopenActionPanel.hidden = false;
+    actionPanel.closest('.workspace-tab-layout')?.classList.remove('has-action-center');
+}));
+reopenActionPanel?.addEventListener('click', () => {
+    if (!actionPanel) return;
+    actionPanel.dataset.dismissed = 'false';
+    actionPanel.hidden = false;
+    reopenActionPanel.hidden = true;
+    actionPanel.closest('.workspace-tab-layout')?.classList.add('has-action-center');
+});
+document.querySelectorAll('[data-attachment-browser]').forEach((browser) => {
+    const frame = browser.querySelector('[data-attachment-frame]');
+    const title = browser.querySelector('[data-attachment-preview-title]');
+    const category = browser.querySelector('[data-attachment-preview-category]');
+    const unavailable = browser.querySelector('[data-attachment-unavailable]');
+
+    browser.querySelectorAll('[data-attachment-select]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const name = button.dataset.attachmentName || 'Attachment';
+            const previewable = button.dataset.attachmentPreviewable === 'true';
+            browser.querySelectorAll('[data-attachment-select]').forEach((item) => {
+                item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+            });
+            title.textContent = name;
+            category.textContent = button.dataset.attachmentCategory || '';
+            frame.title = name;
+            frame.hidden = !previewable;
+            frame.src = previewable ? (button.dataset.attachmentFitUrl || button.dataset.attachmentUrl) : '';
+            unavailable.hidden = previewable;
+        });
+    });
+
+    const expandButton = browser.querySelector('[data-expand-attachment-preview]');
+    const setExpanded = (expanded) => {
+        browser.classList.toggle('is-expanded', expanded);
+        expandButton.setAttribute('aria-pressed', String(expanded));
+        expandButton.textContent = expanded ? 'Return to Workspace' : 'Expand Preview';
+        document.body.classList.toggle('attachment-preview-expanded', expanded);
+        window.dispatchEvent(new Event('resize'));
+    };
+
+    expandButton?.addEventListener('click', () => {
+        setExpanded(!browser.classList.contains('is-expanded'));
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && browser.classList.contains('is-expanded')) setExpanded(false);
+    });
+});
 tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
         tabs.forEach((item) => item.classList.toggle('active', item === tab));
@@ -6,14 +307,17 @@ tabs.forEach((tab) => {
             panel.classList.toggle('active', panel.id === `tab-${tab.dataset.tab}`);
         });
         const actionCenterVisible = ['transmittal', 'receipt', 'proof'].includes(tab.dataset.tab);
-        document.querySelectorAll('[data-action-panel]').forEach((panel) => {
-            panel.hidden = !actionCenterVisible;
-        });
+        const dismissed = actionPanel?.dataset.dismissed === 'true';
+        if (actionPanel) actionPanel.hidden = !actionCenterVisible || dismissed;
+        if (reopenActionPanel) reopenActionPanel.hidden = !actionCenterVisible || !dismissed;
         document.querySelectorAll('.workspace-tab-layout').forEach((layout) => {
-            layout.classList.toggle('has-action-center', actionCenterVisible);
+            layout.classList.toggle('has-action-center', actionCenterVisible && !dismissed);
         });
     });
 });
+
+const proofUploadModal = document.querySelector('[data-proof-modal]');
+if (proofUploadModal) document.body.append(proofUploadModal);
 
 document.querySelectorAll('[data-open-proof-action]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -25,11 +329,13 @@ document.querySelectorAll('[data-open-proof-action]').forEach((button) => {
         }
 
         if (actionPanel) {
+            actionPanel.dataset.dismissed = 'false';
             actionPanel.hidden = false;
+            if (reopenActionPanel) reopenActionPanel.hidden = true;
             actionPanel.closest('.workspace-tab-layout')?.classList.add('has-action-center');
         }
 
-        const modal = actionPanel?.querySelector('[data-proof-modal]');
+        const modal = proofUploadModal;
         if (modal) {
             resetProofForm();
             modal.hidden = false;
@@ -51,7 +357,7 @@ document.querySelectorAll('[data-open-proof-action]').forEach((button) => {
 document.querySelectorAll('[data-toggle-proof-form]').forEach((button) => {
     button.addEventListener('click', () => {
         const panel = button.closest('[data-action-panel]');
-        const modal = panel?.querySelector('[data-proof-modal]');
+        const modal = proofUploadModal;
         if (modal) {
             resetProofForm();
             modal.hidden = false;
@@ -83,6 +389,7 @@ document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
         if (cameraModal && !cameraModal.hidden) stopCamera();
         document.querySelectorAll('[data-proof-modal]:not([hidden])').forEach((modal) => { modal.hidden = true; });
+        if (proofViewModal) proofViewModal.hidden = true;
         document.body.classList.remove('proof-modal-open');
     }
 });
@@ -223,31 +530,83 @@ cameraUseButton?.addEventListener('click', () => {
         if (feedback) feedback.textContent = `${cameraFile.name} is attached. Complete the fields and select Save proof record to add it to the table.`;
     }
 });
-document.querySelectorAll('[data-open-recipient-fields]').forEach((button) => {
+document.querySelectorAll('[data-action-tab]').forEach((button) => {
     button.addEventListener('click', () => {
-        document.querySelector('[data-tab="draft"]')?.click();
-        window.setTimeout(() => {
-            const recipientField = document.querySelector('[name="recipients[0][name]"]');
-            recipientField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            recipientField?.focus({ preventScroll: true });
-        }, 0);
+        document.querySelector(`[data-tab="${button.dataset.actionTab}"]`)?.click();
     });
 });
 
-document.querySelectorAll('[data-open-recipient-view]').forEach((button) => {
+const proofViewModal = document.querySelector('[data-proof-view-modal]');
+document.querySelectorAll('[data-view-proof]').forEach((button) => {
     button.addEventListener('click', () => {
-        document.querySelector('[data-tab="receipt"]')?.click();
+        if (!proofViewModal) return;
+
+        let details;
+        try {
+            details = JSON.parse(button.dataset.proofView || '{}');
+        } catch {
+            return;
+        }
+
+        proofViewModal.querySelectorAll('[data-proof-view-value]').forEach((output) => {
+            output.textContent = details[output.dataset.proofViewValue] || '—';
+        });
+        const evidenceLink = proofViewModal.querySelector('[data-proof-view-evidence]');
+        if (evidenceLink) {
+            evidenceLink.hidden = !details.source_url;
+            if (details.source_url) evidenceLink.href = details.source_url;
+        }
+        proofViewModal.hidden = false;
+        document.body.classList.add('proof-modal-open');
+        proofViewModal.querySelector('[data-close-proof-view]')?.focus({ preventScroll: true });
+    });
+});
+
+document.querySelectorAll('[data-close-proof-view]').forEach((button) => {
+    button.addEventListener('click', () => {
+        if (proofViewModal) proofViewModal.hidden = true;
+        document.body.classList.remove('proof-modal-open');
+    });
+});
+
+document.querySelectorAll('[data-confirm]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+        if (!window.confirm(form.dataset.confirm)) event.preventDefault();
     });
 });
 
 document.querySelectorAll('[data-cancel-confirm]').forEach((form) => {
     form.addEventListener('submit', (event) => {
-        const reason = window.prompt('Enter the reason for cancelling this transmittal:')?.trim();
+        if (form.dataset.submitting === 'true') {
+            event.preventDefault();
+            return;
+        }
+        const verb = form.hasAttribute('data-archive-confirm') ? 'archiving' : 'cancelling';
+        const reason = window.prompt(`Enter the reason for ${verb} this transmittal:`)?.trim();
         if (!reason) {
             event.preventDefault();
             return;
         }
         form.querySelector('[name="reason"]').value = reason;
+        form.dataset.submitting = 'true';
+        form.setAttribute('aria-busy', 'true');
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) {
+            submitButton.dataset.originalLabel = submitButton.textContent;
+            submitButton.textContent = verb === 'archiving' ? 'Archiving…' : 'Cancelling…';
+            submitButton.disabled = true;
+        }
+    });
+});
+window.addEventListener('pageshow', () => {
+    document.querySelectorAll('[data-cancel-confirm][data-submitting="true"]').forEach((form) => {
+        delete form.dataset.submitting;
+        form.removeAttribute('aria-busy');
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) {
+            submitButton.disabled = false;
+            if (submitButton.dataset.originalLabel) submitButton.textContent = submitButton.dataset.originalLabel;
+        }
     });
 });
 
@@ -411,11 +770,40 @@ const syncWorkspacePreview = () => {
         }
     });
 
-    const direction = document.querySelector('select[name="direction"]')?.value || 'send';
-    const office = document.querySelector('input[name="origin_office"]')?.value.trim() || 'â€”';
-    const recipient = document.querySelector('input[name="recipients[0][name]"]')?.value.trim()
-        || document.querySelector('input[name="related_company"]')?.value.trim()
-        || 'â€”';
+    const draftForm = document.querySelector('#transmittal-form');
+    if (draftForm) {
+        const previewFields = {
+            subject: '[name="subject"]',
+            confidentiality: '[name="confidentiality"]',
+            date: '[name="transmittal_date"]',
+            direction: '[name="direction"]',
+            address: '[name="recipient_address"]',
+            'recipient-email': '[name="recipients[0][email]"]',
+            'delivery-type': '[name="delivery_type"]',
+            'approved-by': '[name="approved_by_name"]',
+            'delivered-by': '[name="delivered_by"]',
+            'received-by': '[name="received_by"]',
+            'operations-manager': '[name="operations_manager"]',
+            'processing-company': '[name="processing_company"]'
+        };
+
+        Object.entries(previewFields).forEach(([key, selector]) => {
+            const field = draftForm.querySelector(selector);
+            if (!field) return;
+            let value = field.value.trim();
+            if (key === 'confidentiality' || key === 'direction') value = value.toUpperCase();
+            if (key === 'delivery-type') value = field.selectedOptions[0]?.textContent.trim() || value;
+            document.querySelectorAll(`[data-preview-output="${key}"]`).forEach((output) => {
+                output.textContent = value || '—';
+            });
+        });
+    }
+
+    const direction = draftForm?.querySelector('[name="direction"]')?.value || 'send';
+    const office = draftForm?.querySelector('[name="origin_office"]')?.value.trim() || '—';
+    const recipient = draftForm?.querySelector('[name="recipients[0][name]"]')?.value.trim()
+        || draftForm?.querySelector('[name="related_company"]')?.value.trim()
+        || '—';
     document.querySelectorAll('[data-preview-output="from"]').forEach((output) => {
         output.textContent = direction === 'receive' ? recipient : office;
     });
@@ -525,8 +913,10 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
     const categories = ['document', 'receipt', 'proof', 'attachment'];
     const maxOcrFiles = Number(analyzeButton.dataset.maxFiles || 10);
     const categoryLabel = (value) => value[0].toUpperCase() + value.slice(1);
+    const transmittalZipInput = document.querySelector('#transmittal-zip-input');
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
     const uploadChunkBytes = Number(transmittalForm?.dataset.chunkBytes || 5242880);
+    const maxUploadBytes = Number(transmittalForm?.dataset.uploadMaxBytes || 52428800);
     const resumeKey = (file) => `ordo-upload:${encodeURIComponent(file.name)}:${file.size}:${file.lastModified}`;
     const savedUpload = (file) => {
         try {
@@ -694,6 +1084,48 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
             token.name = 'upload_ocr_tokens[]';
             token.value = selectedFiles[index].analysisToken || '';
             row.append(type, copy, select, token);
+
+            if (file.size > maxUploadBytes) {
+                const assist = document.createElement('div');
+                assist.className = 'upload-size-assist error';
+                const message = document.createElement('p');
+                message.className = 'upload-size-message error';
+                message.textContent = `You've reached the maximum upload limit. Please reduce the file size or upload your documents as a supported compressed archive.`;
+                const compress = document.createElement('button');
+                compress.type = 'button';
+                compress.className = 'upload-compress-button';
+                compress.textContent = 'Compress and use';
+                compress.addEventListener('click', async () => {
+                    compress.disabled = true;
+                    message.textContent = `Compressing ${file.name}…`;
+                    try {
+                        selectedFiles[index] = await compressUploadFile(file, maxUploadBytes);
+                        renderFiles();
+                        ocrMessage.classList.remove('error');
+                        ocrMessage.textContent = `${selectedFiles[index].name} compressed and is ready to upload.`;
+                        if (/\.(pdf|jpe?g|png|tiff?)$/i.test(selectedFiles[index].name)) analyzeButton.click();
+                    } catch (error) {
+                        message.textContent = error.message || 'The selected file could not be compressed.';
+                        compress.disabled = false;
+                    }
+                });
+                const archiveButton = document.createElement('button');
+                archiveButton.type = 'button';
+                archiveButton.className = 'upload-compress-button';
+                archiveButton.textContent = 'Upload Compressed File';
+                archiveButton.addEventListener('click', () => transmittalZipInput?.click());
+                const archiveHint = document.createElement('small');
+                archiveHint.className = 'upload-limit-archive-hint';
+                archiveHint.textContent = 'Upload supported ZIP archives to combine multiple documents into one upload.';
+                const heading = document.createElement('strong');
+                heading.className = 'upload-limit-heading';
+                heading.textContent = 'Upload Limit Reached';
+                const choose = document.createElement('span');
+                choose.className = 'upload-limit-choice';
+                choose.textContent = 'Choose an option';
+                assist.append(heading, message, choose, compress, archiveButton, archiveHint);
+                row.append(assist);
+            }
             fileList.append(row);
         });
         analyzeButton.disabled = selectedFiles.length === 0;
@@ -707,16 +1139,22 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
                 merged.push(file);
             }
         });
-        selectedFiles = merged.slice(0, 20);
-        if (selectedFiles.length < merged.length && ocrMessage) ocrMessage.textContent = 'A maximum of 20 files can be attached.';
+        selectedFiles = merged.slice(0, maxOcrFiles);
+        if (selectedFiles.length < merged.length && ocrMessage) ocrMessage.textContent = `A maximum of ${maxOcrFiles} files can be attached.`;
         renderFiles();
+
+        const oversized = selectedFiles.filter((file) => file.size > maxUploadBytes);
+        if (oversized.length && ocrMessage) {
+            ocrMessage.classList.add('error');
+            ocrMessage.textContent = `${oversized.length} file(s) exceed the ${formatUploadSize(maxUploadBytes)} per-file maximum. Compress the oversized file(s) from the file list before uploading.`;
+        }
 
         // Automatically start OCR after files are selected or dropped.
         // Let renderFiles() finish first so selectedFiles and the input are synchronized.
         const hasOcrFiles = selectedFiles.some((file) => /\.(pdf|jpe?g|png|tiff?)$/i.test(file.name));
-        if (hasOcrFiles && !analyzeButton.disabled) {
+        if (hasOcrFiles && !oversized.length && !analyzeButton.disabled) {
             window.setTimeout(() => {
-                if (!analyzeButton.disabled && selectedFiles.some((file) => /\.(pdf|jpe?g|png|tiff?)$/i.test(file.name))) {
+                if (!analyzeButton.disabled && !selectedFiles.some((file) => file.size > maxUploadBytes) && selectedFiles.some((file) => /\.(pdf|jpe?g|png|tiff?)$/i.test(file.name))) {
                     analyzeButton.click();
                 }
             }, 0);
@@ -724,6 +1162,22 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
     };
 
     documentInput.addEventListener('change', () => acceptFiles(documentInput.files));
+    transmittalZipInput?.addEventListener('change', async () => {
+        const archive = transmittalZipInput.files?.[0];
+        transmittalZipInput.value = '';
+        if (!archive) return;
+        try {
+            ocrMessage.classList.remove('error');
+            ocrMessage.textContent = `Expanding ${archive.name} in this browser...`;
+            selectedFiles = selectedFiles.filter((file) => file.size <= maxUploadBytes);
+            const files = await extractUploadArchive(archive, { maxBytes: maxUploadBytes, maxFiles: Math.max(0, maxOcrFiles - selectedFiles.length) });
+            acceptFiles(files);
+            ocrMessage.textContent = `${files.length} files were extracted and added to the upload queue.`;
+        } catch (error) {
+            ocrMessage.classList.add('error');
+            ocrMessage.textContent = error.message || 'The ZIP archive could not be processed.';
+        }
+    });
     if (dropZone) {
         ['dragenter', 'dragover'].forEach((name) => dropZone.addEventListener(name, (event) => {
             event.preventDefault();
@@ -737,6 +1191,11 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
     }
 
     analyzeButton.addEventListener('click', async () => {
+        if (selectedFiles.some((file) => file.size > maxUploadBytes)) {
+            ocrMessage.classList.add('error');
+            ocrMessage.textContent = `Files must be under ${formatUploadSize(maxUploadBytes)} each. Compress the oversized file(s) before analysis.`;
+            return;
+        }
         analyzeButton.disabled = true;
         analyzeButton.textContent = 'Analyzingâ€¦';
         ocrMessage.classList.remove('error');
@@ -817,6 +1276,12 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
     });
 
     transmittalForm?.addEventListener('submit', async (event) => {
+        if (selectedFiles.some((file) => file.size > maxUploadBytes)) {
+            event.preventDefault();
+            ocrMessage?.classList.add('error');
+            if (ocrMessage) ocrMessage.textContent = `Files must be under ${formatUploadSize(maxUploadBytes)} each. Compress the oversized file(s) before uploading.`;
+            return;
+        }
         if (transmittalForm.dataset.uploadsReady === 'true') return;
         event.preventDefault();
         if (transmittalForm.dataset.submissionPending === 'true') return;

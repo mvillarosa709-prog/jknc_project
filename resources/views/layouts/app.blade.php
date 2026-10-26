@@ -11,6 +11,7 @@
 
     <style>
         :root {
+            --topbar-height: 52px;
             --sidebar-width: 230px;
             --sidebar-collapsed-width: 78px;
             --sidebar-bg: #ffffff;
@@ -54,13 +55,13 @@
 
         .sidebar {
             position: fixed;
-            inset: 0 auto 0 0;
+            inset: var(--topbar-height) auto 0 0;
             z-index: 100;
             display: flex;
             flex-direction: column;
             width: var(--sidebar-width);
-            height: 100vh;
-            padding: 16px 10px 12px;
+            height: calc(100vh - var(--topbar-height));
+            padding: 0 10px 12px;
             overflow-x: hidden;
             overflow-y: auto;
             background: var(--sidebar-bg);
@@ -73,40 +74,21 @@
             min-width: 0;
             min-height: 100vh;
             margin-left: var(--sidebar-width);
+            padding-top: var(--topbar-height);
             transition: margin-left 0.2s ease;
         }
 
-        /* Brand and sidebar header */
-        .brand-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            min-height: 43px;
-            padding: 0 5px 14px;
-            border-bottom: 1px solid #f1f5f9;
-        }
-
+        /* Company brand in the global header */
         .brand {
             display: flex;
             align-items: center;
-            gap: 9px;
+            gap: 0;
             min-width: 0;
             color: #000000;
         }
 
         .brand-mark {
-            display: grid;
-            flex: 0 0 34px;
-            width: 34px;
-            height: 34px;
-            place-items: center;
-            border: 1px solid #e5e7eb;
-            border-radius: 9px;
-            background: #f1f3f7;
-            color: #000000;
-            font-size: 12px;
-            font-weight: 800;
+            display: none;
         }
 
         .brand-text {
@@ -119,16 +101,17 @@
         .brand-text strong {
             overflow: hidden;
             color: #000000;
+            font-family: Georgia, 'Times New Roman', serif;
             font-size: 12px;
-            font-weight: 700;
-            line-height: 1.3;
+            font-weight: 500;
+            line-height: 1.1;
             text-overflow: ellipsis;
         }
 
         .brand-text small {
             color: #64748b;
-            font-size: 9px;
-            letter-spacing: 0.35px;
+            font-size: 8px;
+            letter-spacing: 0.2px;
         }
 
         .sidebar-toggle {
@@ -150,28 +133,54 @@
         }
 
         .nav-heading {
-            padding: 17px 10px 10px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            min-height: 60px;
+            padding: 9px 0;
+            border-bottom: 1px solid #f1f5f9;
         }
 
-        .nav-heading strong {
+        .nav-heading-icon {
+            display: grid;
+            flex: 0 0 32px;
+            width: 32px;
+            height: 32px;
+            place-items: center;
+            border: 1px solid #dbeafe;
+            border-radius: 9px;
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .nav-heading-copy { flex: 1; min-width: 0; }
+
+        .nav-heading-copy strong {
             display: block;
-            color: #000000;
+            color: #111827;
             font-size: 12px;
             font-weight: 700;
         }
 
-        .nav-heading small {
+        .nav-heading-copy small {
             display: block;
             margin-top: 3px;
             color: #94a3b8;
             font-size: 10px;
         }
 
+        .sidebar-toggle { color: #64748b; }
+
+        .sidebar-toggle svg { transition: transform 0.2s ease; }
+
+        .shell.sidebar-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+
         /* Navigation links */
         .sidebar-nav {
             display: flex;
             flex-direction: column;
             gap: 4px;
+            padding-top: 10px;
         }
 
         .nav-link {
@@ -180,14 +189,16 @@
             align-items: center;
             gap: 10px;
             width: 100%;
-            min-height: 42px;
-            padding: 6px 9px;
+            min-height: 40px;
+            padding: 5px 9px;
             border: 1px solid transparent;
             border-radius: 9px;
             background: transparent;
-            color: #111827;
-            font-size: 12px;
+            color: #223b5d;
+            font-size: 11px;
+            font-weight: 400;
             line-height: 1.3;
+            margin-bottom: 3px;
             cursor: pointer;
             transition: background 0.15s ease, border-color 0.15s ease;
         }
@@ -195,6 +206,10 @@
         .nav-link:hover {
             background: #f8fafc;
             border-color: #f1f5f9;
+        }
+
+        .nav-link-unavailable {
+            cursor: default;
         }
 
         .nav-link.active {
@@ -205,20 +220,20 @@
 
         .nav-icon {
             display: inline-grid;
-            flex: 0 0 30px;
-            width: 30px;
-            height: 30px;
+            flex: 0 0 27px;
+            width: 27px;
+            height: 27px;
             place-items: center;
             border: 1px solid var(--icon-border);
-            border-radius: 8px;
+            border-radius: 7px;
             background: var(--icon-bg);
             color: var(--icon-color);
         }
 
         .nav-icon svg {
             display: block;
-            width: 15px;
-            height: 15px;
+            width: 14px;
+            height: 14px;
             fill: none;
             stroke: #000000;
             stroke-width: 1.8;
@@ -229,6 +244,10 @@
         .nav-link.active .nav-icon {
             background: #dbeafe;
             border-color: #bfdbfe;
+        }
+
+        .nav-link.active .nav-icon svg {
+            stroke: #2563eb;
         }
 
         .nav-text {
@@ -253,7 +272,7 @@
 
         /* Expandable submenu */
         .nav-group {
-            margin-top: 5px;
+            margin-top: 0;
         }
 
         .submenu {
@@ -268,9 +287,18 @@
         }
 
         .submenu .nav-link {
-            min-height: 35px;
-            padding: 6px 9px;
-            font-size: 12px;
+            min-height: 32px;
+            margin-bottom: 0;
+            padding: 5px 9px;
+            font-size: 11px;
+        }
+
+        .submenu-message {
+            margin: 0;
+            padding: 8px 9px;
+            color: #64748b;
+            font-size: 10px;
+            line-height: 1.4;
         }
 
         .submenu .nav-link.active {
@@ -375,29 +403,32 @@
 
         /* Top header */
         .topbar {
-            position: sticky;
-            top: 0;
-            z-index: 50;
+            position: fixed;
+            inset: 0 0 auto;
+            z-index: 120;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            min-height: 65px;
-            padding: 10px 22px;
+            min-height: var(--topbar-height);
+            padding: 7px 22px;
             border-bottom: 1px solid #e5e7eb;
             background: #ffffff;
         }
 
         .top-search {
+            position: absolute;
+            left: 50%;
             display: flex;
             align-items: center;
             gap: 10px;
             width: min(460px, 65%);
             height: 38px;
-            margin: 0 auto;
+            margin: 0;
             padding: 0 14px;
             border: 1px solid transparent;
             border-radius: 22px;
             background: #f3f4f6;
+            transform: translateX(-50%);
         }
 
         .top-search:focus-within {
@@ -426,6 +457,8 @@
         }
 
         .topbar > .admin-avatar {
+            position: relative;
+            z-index: 1;
             flex-shrink: 0;
         }
 
@@ -470,8 +503,7 @@
             margin-left: var(--sidebar-collapsed-width);
         }
 
-        .shell.sidebar-collapsed .brand-text,
-        .shell.sidebar-collapsed .nav-heading,
+        .shell.sidebar-collapsed .nav-heading-copy,
         .shell.sidebar-collapsed .nav-text,
         .shell.sidebar-collapsed .arrow,
         .shell.sidebar-collapsed .submenu,
@@ -481,19 +513,11 @@
             display: none !important;
         }
 
-        .shell.sidebar-collapsed .brand-row {
+        .shell.sidebar-collapsed .nav-heading {
             justify-content: center;
-            flex-wrap: wrap;
+            gap: 0;
             padding-right: 0;
             padding-left: 0;
-        }
-
-        .shell.sidebar-collapsed .brand {
-            justify-content: center;
-        }
-
-        .shell.sidebar-collapsed .sidebar-toggle {
-            flex-basis: 100%;
         }
 
         .shell.sidebar-collapsed .nav-link {
@@ -503,9 +527,9 @@
         }
 
         .shell.sidebar-collapsed .nav-icon {
-            flex-basis: 34px;
-            width: 34px;
-            height: 34px;
+            flex-basis: 32px;
+            width: 32px;
+            height: 32px;
         }
 
         .shell.sidebar-collapsed .nav-group > .nav-link > span:first-child {
@@ -521,50 +545,14 @@
 
         /* Responsive layout */
         @media (max-width: 760px) {
-            .sidebar {
-                width: var(--sidebar-collapsed-width);
-                padding-right: 9px;
-                padding-left: 9px;
-            }
-
-            .main {
-                margin-left: var(--sidebar-collapsed-width);
-            }
-
-            .sidebar .brand-text,
-            .sidebar .nav-heading,
-            .sidebar .nav-text,
-            .sidebar .arrow,
-            .sidebar .submenu,
-            .sidebar .user-copy,
-            .sidebar .security-note,
-            .sidebar .user-card form {
-                display: none;
-            }
-
-            .sidebar .brand-row {
-                justify-content: center;
-                flex-wrap: wrap;
-            }
-
-            .sidebar .sidebar-toggle {
-                flex-basis: 100%;
-            }
-
-            .sidebar .nav-link {
-                justify-content: center;
-                padding: 5px;
-            }
-
-            .sidebar .nav-group > .nav-link > span:first-child {
-                display: flex;
-                justify-content: center;
-            }
-
             .topbar {
                 padding-right: 12px;
                 padding-left: 12px;
             }
+
+            .topbar .brand-text { display: none; }
+
+            .top-search { width: min(300px, 46vw); }
 
             .page {
                 padding: 12px;
@@ -576,16 +564,16 @@
 <body>
     <div class="shell" id="appShell">
         <aside class="sidebar" aria-label="Main navigation">
-            <div class="brand-row">
-                <a class="brand" href="{{ route('transmittals.index') }}">
-                    <span class="brand-mark" aria-hidden="true">JK</span>
-
-                    <span class="brand-text">
-                        <strong>{{ config('ordo.office_name') }}</strong>
-                        <small>ORDO INTERNAL SYSTEM</small>
-                    </span>
-                </a>
-
+            <div class="nav-heading">
+                <span class="nav-heading-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="m12 3 9 5-9 5-9-5 9-5Zm-7.2 8.5L12 15l7.2-3.5L21 12.5l-9 5-9-5 1.8-1Zm0 4L12 19l7.2-3.5L21 16.5l-9 5-9-5 1.8-1Z"/>
+                    </svg>
+                </span>
+                <span class="nav-heading-copy">
+                    <strong>Enterprise Menu</strong>
+                    <small>Navigation</small>
+                </span>
                 <button
                     type="button"
                     class="sidebar-toggle"
@@ -595,146 +583,105 @@
                 >
                     <svg width="18" height="18" viewBox="0 0 24 24"
                          fill="none" stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" aria-hidden="true">
-                        <path d="M4 6h16M4 12h16M4 18h16"/>
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m7 6 6 6-6 6M14 6l6 6-6 6"/>
                     </svg>
                 </button>
             </div>
 
-            <div class="nav-heading">
-                <strong>Enterprise Menu</strong>
-                <small>Navigation</small>
-            </div>
-
             <nav class="sidebar-nav" aria-label="Enterprise menu">
-                <a class="nav-link" href="#" title="Admin">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                            <circle cx="10" cy="7" r="4"/>
-                            <path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                    </span>
+                <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Admin">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                     <span class="nav-text">Admin</span>
-                </a>
+                </span>
 
-                <a class="nav-link" href="#" title="Town Hall">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="m3 11 18-5-5 12-4-5-5-2z"/>
-                            <path d="m12 13 1 7"/>
-                        </svg>
-                    </span>
+                <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Town Hall">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 10v4a1 1 0 0 0 1 1h3l9 5V4l-9 5H4a1 1 0 0 0-1 1Z"/><path d="m7 15 2 6m11-14a6 6 0 0 1 0 8"/></svg></span>
                     <span class="nav-text">Town Hall</span>
-                </a>
+                </span>
 
-                <a class="nav-link" href="#" title="Corporate">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <rect x="4" y="3" width="16" height="18" rx="1"/>
-                            <path d="M9 21v-4h6v4M8 7h2m4 0h2M8 11h2m4 0h2"/>
-                        </svg>
-                    </span>
+                <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Corporate">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1"/><path d="M9 21v-4h6v4M8 7h2m4 0h2M8 11h2m4 0h2"/></svg></span>
                     <span class="nav-text">Corporate</span>
-                </a>
+                </span>
 
-                <a class="nav-link" href="#" title="Policies">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <path d="M14 2v6h6M8 13h8M8 17h8"/>
-                        </svg>
-                    </span>
+                <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Policies">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16h16V8z"/><path d="M14 2v6h6M8 13h8m-8 4h8"/></svg></span>
                     <span class="nav-text">Policies</span>
-                </a>
+                </span>
 
-                <a class="nav-link" href="#" title="Finance">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <rect x="2" y="5" width="20" height="14" rx="2"/>
-                            <path d="M2 10h20M6 15h4"/>
-                        </svg>
-                    </span>
+                <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Finance">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
                     <span class="nav-text">Finance</span>
-                </a>
+                </span>
 
-                <a class="nav-link" href="#" title="Human Capital">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <circle cx="12" cy="8" r="4"/>
-                            <path d="M5 21v-2a7 7 0 0 1 14 0v2"/>
-                        </svg>
-                    </span>
+                <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Human Capital">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/></svg></span>
                     <span class="nav-text">Human Capital</span>
-                </a>
+                </span>
 
-                <a class="nav-link" href="#" title="Marketing">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="9"/>
-                            <path d="M8 14c1 2 3 3 5 2s3-3 2-5-3-3-5-2-3 3-2 5z"/>
-                            <circle cx="12" cy="12" r="1"/>
-                        </svg>
-                    </span>
-                    <span class="nav-text">Marketing</span>
-                    <span class="arrow" aria-hidden="true">›</span>
-                </a>
+                <div class="nav-group">
+                    <button class="nav-link" type="button" data-sidebar-submenu-toggle aria-expanded="false" aria-controls="marketingSubmenu">
+                        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 14c1 2 3 3 5 2s3-3 2-5-3-3-5-2-3 2-3 5z"/><circle cx="12" cy="12" r="1"/></svg></span>
+                        <span class="nav-text">Marketing</span>
+                        <span class="arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+                    </button>
+                    <div class="submenu" id="marketingSubmenu"><p class="submenu-message">This section has no pages in this application.</p></div>
+                </div>
 
-                <a class="nav-link" href="#" title="Sales">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <path d="M3 3v18h18"/>
-                            <path d="m7 14 4-4 3 3 6-7"/>
-                        </svg>
-                    </span>
-                    <span class="nav-text">Sales</span>
-                    <span class="arrow" aria-hidden="true">›</span>
-                </a>
+                <div class="nav-group">
+                    <button class="nav-link" type="button" data-sidebar-submenu-toggle aria-expanded="false" aria-controls="salesSubmenu">
+                        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l4-4 3 3 6-7"/></svg></span>
+                        <span class="nav-text">Sales</span>
+                        <span class="arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+                    </button>
+                    <div class="submenu" id="salesSubmenu"><p class="submenu-message">This section has no pages in this application.</p></div>
+                </div>
 
-                <a class="nav-link" href="#" title="Accounts">
-                    <span class="nav-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                            <rect x="3" y="5" width="18" height="14" rx="2"/>
-                            <circle cx="9" cy="11" r="2"/>
-                            <path d="M6 16c.7-2 5.3-2 6 0m3-5h3m-3 4h3"/>
-                        </svg>
-                    </span>
-                    <span class="nav-text">Accounts</span>
-                    <span class="arrow" aria-hidden="true">›</span>
-                </a>
+                <div class="nav-group">
+                    <button class="nav-link" type="button" data-sidebar-submenu-toggle aria-expanded="false" aria-controls="accountsSubmenu">
+                        <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.7-2 5.3-2 6 0m3-5h3m-3 4h3"/></svg></span>
+                        <span class="nav-text">Accounts</span>
+                        <span class="arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+                    </button>
+                    <div class="submenu" id="accountsSubmenu"><p class="submenu-message">This section has no pages in this application.</p></div>
+                </div>
 
-                <div class="nav-group open" id="operationsGroup">
+                <div class="nav-group {{ request()->routeIs('transmittals.*') ? 'open' : '' }}" id="operationsGroup">
                     <button
                         type="button"
                         class="nav-link {{ request()->routeIs('transmittals.*') ? 'active' : '' }}"
                         id="operationsToggle"
-                        aria-expanded="true"
+                        data-sidebar-submenu-toggle
+                        aria-expanded="{{ request()->routeIs('transmittals.*') ? 'true' : 'false' }}"
                         aria-controls="operationsSubmenu"
                     >
                         <span style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
                             <span class="nav-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24">
-                                    <rect x="3" y="4" width="18" height="16" rx="2"/>
-                                    <path d="M3 9h18M8 4v5m8-5v5M8 13h3m2 0h3M8 16h3"/>
+                                    <circle cx="6" cy="4" r="2"/>
+                                    <circle cx="18" cy="7" r="2"/>
+                                    <circle cx="6" cy="20" r="2"/>
+                                    <path d="M6 6v12m12-9a9 9 0 0 1-9 9"/>
                                 </svg>
                             </span>
                             <span class="nav-text">Operations</span>
                         </span>
-                        <span class="arrow" aria-hidden="true">›</span>
+                        <span class="arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
                     </button>
 
                     <div class="submenu" id="operationsSubmenu">
-                        <a class="nav-link" href="#" title="Activities">
+                        <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Activities">
                             <span class="nav-text">Activities</span>
-                        </a>
+                        </span>
 
-                        <a class="nav-link" href="#" title="Regular">
+                        <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Regular">
                             <span class="nav-text">Regular</span>
-                        </a>
+                        </span>
 
-                        <a class="nav-link" href="#" title="Project">
+                        <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Project">
                             <span class="nav-text">Project</span>
-                        </a>
+                        </span>
 
                         <a
                             class="nav-link {{ request()->routeIs('transmittals.*') ? 'active' : '' }}"
@@ -745,9 +692,10 @@
                             <span class="nav-text">Transmittal</span>
                         </a>
 
-                        <a class="nav-link" href="#" title="Visitor Log">
+                        <span class="nav-link nav-link-unavailable" aria-disabled="true" title="Visitor Log">
                             <span class="nav-text">Visitor Log</span>
-                        </a>
+                            <span class="arrow" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+                        </span>
                     </div>
                 </div>
             </nav>
@@ -791,8 +739,16 @@
 
         <main class="main">
             <header class="topbar">
+                <a class="brand" href="{{ route('transmittals.index') }}" aria-label="{{ config('ordo.office_name') }} home">
+                    <span class="brand-mark" aria-hidden="true">JK</span>
+                    <span class="brand-text">
+                        <strong>John Kelly</strong>
+                        <small>&amp; Company</small>
+                    </span>
+                </a>
+
                 <form class="top-search" method="get" action="{{ route('transmittals.index') }}">
-                    <span aria-hidden="true">⌕</span>
+                    <span aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>
                     <input
                         type="search"
                         name="q"
@@ -840,8 +796,11 @@
         (() => {
             const shell = document.getElementById('appShell');
             const sidebarToggle = document.getElementById('sidebarToggle');
-            const operationsGroup = document.getElementById('operationsGroup');
-            const operationsToggle = document.getElementById('operationsToggle');
+
+            if (window.matchMedia('(max-width: 760px)').matches && shell) {
+                shell.classList.add('sidebar-collapsed');
+                sidebarToggle?.setAttribute('aria-expanded', 'false');
+            }
 
             if (sidebarToggle && shell) {
                 sidebarToggle.addEventListener('click', () => {
@@ -850,12 +809,15 @@
                 });
             }
 
-            if (operationsToggle && operationsGroup) {
-                operationsToggle.addEventListener('click', () => {
-                    const isOpen = operationsGroup.classList.toggle('open');
-                    operationsToggle.setAttribute('aria-expanded', String(isOpen));
+            document.querySelectorAll('[data-sidebar-submenu-toggle]').forEach((toggle) => {
+                toggle.addEventListener('click', () => {
+                    const group = toggle.closest('.nav-group');
+                    if (!group) return;
+
+                    const isOpen = group.classList.toggle('open');
+                    toggle.setAttribute('aria-expanded', String(isOpen));
                 });
-            }
+            });
         })();
     </script>
 

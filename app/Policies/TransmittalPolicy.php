@@ -13,6 +13,15 @@ class TransmittalPolicy
             || $transmittal->prepared_by === $user->id;
     }
 
+    public function viewAttachments(User $user, Transmittal $transmittal): bool
+    {
+        return $user->transmittal_role === 'client'
+            || $this->view($user, $transmittal)
+            || $transmittal->recipients()
+                ->whereRaw('LOWER(email) = ?', [mb_strtolower($user->email)])
+                ->exists();
+    }
+
     public function approve(User $user, Transmittal $transmittal): bool
     {
         return $user->canApproveTransmittals()

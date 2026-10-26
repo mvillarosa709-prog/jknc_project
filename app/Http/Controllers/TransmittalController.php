@@ -134,17 +134,17 @@ class TransmittalController extends Controller
     public function createFromSmartUpload(Request $request, ResumableTransmittalUploadService $uploads): RedirectResponse
     {
         $validated = $request->validate([
-            'documents' => ['nullable', 'array', 'max:20'],
-            'documents.*' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx,txt'],
-            'categories' => ['nullable', 'array', 'max:20'],
+            'documents' => ['nullable', 'array', 'max:50'],
+            'documents.*' => ['required', 'file', 'max:'.(int) ceil(config('ordo.upload.max_bytes') / 1024), 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx,txt'],
+            'categories' => ['nullable', 'array', 'max:50'],
             'categories.*' => ['required', Rule::in(['document', 'receipt', 'proof', 'attachment'])],
-            'ocr_tokens' => ['nullable', 'array', 'max:20'],
+            'ocr_tokens' => ['nullable', 'array', 'max:50'],
             'ocr_tokens.*' => ['nullable', 'string', 'max:100000'],
-            'upload_ids' => ['nullable', 'array', 'max:20'],
+            'upload_ids' => ['nullable', 'array', 'max:50'],
             'upload_ids.*' => ['required', 'uuid', 'distinct'],
-            'upload_categories' => ['nullable', 'array', 'max:20'],
+            'upload_categories' => ['nullable', 'array', 'max:50'],
             'upload_categories.*' => ['required', Rule::in(['document', 'receipt', 'proof', 'attachment'])],
-            'upload_ocr_tokens' => ['nullable', 'array', 'max:20'],
+            'upload_ocr_tokens' => ['nullable', 'array', 'max:50'],
             'upload_ocr_tokens.*' => ['nullable', 'string', 'max:100000'],
             'subject' => ['required', 'string', 'max:200'],
             'external_reference' => ['nullable', 'string', 'max:120'],
@@ -169,8 +169,8 @@ class TransmittalController extends Controller
         if ($directFiles === [] && $uploadIds === []) {
             throw ValidationException::withMessages(['documents' => 'Choose at least one file to upload.']);
         }
-        if (count($directFiles) + count($uploadIds) > 20) {
-            throw ValidationException::withMessages(['documents' => 'A maximum of 20 files can be attached.']);
+        if (count($directFiles) + count($uploadIds) > config('ordo.ocr.max_files', 50)) {
+            throw ValidationException::withMessages(['documents' => 'A maximum of '.config('ordo.ocr.max_files', 50).' files can be attached.']);
         }
 
         $fileEntries = [];
@@ -341,12 +341,68 @@ public function workspace(Request $request, Transmittal $transmittal): View
             'proofs.document',
             'histories.actor',
         ]);
+        $this->associateLegacyItemDocumentsForPreview($transmittal);
 
         return view('transmittals.workspace', [
             'transmittal' => $transmittal,
             'canViewPrivateFiles' => $this->canViewPrivateFiles($request, $transmittal),
+            'canViewAttachments' => $this->canViewPrivateAttachments($request, $transmittal),
+            'canManageLifecycle' => $this->canManageLifecycle($request, $transmittal),
             'canUploadProof' => true, // Ginawa nating true para makapag-upload kaagad ang kahit sino sa workspace
         ] + $this->signatoryDirectory());
+    }
+
+    private function associateLegacyItemDocumentsForPreview(Transmittal $transmittal): void
+    {
+        $documents = $transmittal->documents->values();
+        $items = $transmittal->items->values();
+
+        if ($documents->isEmpty() || $items->isEmpty()) {
+            return;
+        }
+
+        $usedDocumentIds = $items->pluck('document_id')->filter()->all();
+        $normalize = static fn (string $value): string => preg_replace(
+            '/[^a-z0-9]/',
+            '',
+            mb_strtolower($value)
+        ) ?? '';
+
+        foreach ($items as $index => $item) {
+            if ($item->document_id || $item->document) {
+                continue;
+            }
+
+            $itemText = $normalize(implode(' ', array_filter([
+                $item->particular,
+                $item->unique_id,
+                $item->description,
+                $item->remarks,
+            ])));
+
+            $document = $documents->first(function (TransmittalDocument $candidate) use ($itemText, $normalize, $usedDocumentIds): bool {
+                if (in_array($candidate->id, $usedDocumentIds, true)) {
+                    return false;
+                }
+
+                $name = pathinfo($candidate->original_name, PATHINFO_FILENAME);
+                $normalizedName = $normalize($name);
+
+                return strlen($normalizedName) >= 6 && str_contains($itemText, $normalizedName);
+            });
+
+            if (! $document && $documents->count() === $items->count()) {
+                $candidate = $documents->get($index);
+                if ($candidate && ! in_array($candidate->id, $usedDocumentIds, true)) {
+                    $document = $candidate;
+                }
+            }
+
+            if ($document) {
+                $item->setRelation('document', $document);
+                $usedDocumentIds[] = $document->id;
+            }
+        }
     }
 
     public function edit(Request $request, Transmittal $transmittal): RedirectResponse
@@ -359,8 +415,8 @@ public function workspace(Request $request, Transmittal $transmittal): View
     public function analyze(Request $request, TransmittalOcrService $ocr): JsonResponse
     {
         $data = $request->validate([
-            'documents' => ['required', 'array', 'min:1', 'max:'.config('ordo.ocr.max_files')],
-            'documents.*' => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,tif,tiff'],
+            'documents' => ['required', 'array', 'min:1', 'max:'.config('ordo.ocr.max_files', 50)],
+            'documents.*' => ['required', 'file', 'max:'.(int) ceil(config('ordo.upload.max_bytes') / 1024), 'mimes:pdf,jpg,jpeg,png,tif,tiff'],
         ]);
 
         try {
@@ -461,8 +517,8 @@ public function workspace(Request $request, Transmittal $transmittal): View
             ])->save();
 
             $this->syncRecipients($transmittal, $validated['recipients'] ?? []);
-            $this->storeDocuments($transmittal, $request, $user, $validated);
-            $this->syncItems($transmittal, $request, $user, $validated);
+            $uploadedDocuments = $this->storeDocuments($transmittal, $request, $user, $validated);
+            $this->syncItems($transmittal, $request, $user, $validated, $uploadedDocuments);
 
             $transmittal->histories()->create([
                 'actor_id' => $user?->id,
@@ -541,9 +597,9 @@ public function workspace(Request $request, Transmittal $transmittal): View
             if ($hasRecipientEmail || ! $isDraft || $record->recipients()->doesntExist()) {
                 $this->syncRecipients($record, $recipients);
             }
-            $this->storeDocuments($record, $request, $user, $validated);
+            $uploadedDocuments = $this->storeDocuments($record, $request, $user, $validated);
             if (array_key_exists('items', $validated)) {
-                $this->syncItems($record, $request, $user, $validated);
+                $this->syncItems($record, $request, $user, $validated, $uploadedDocuments);
             }
             $record->histories()->create([
                 'actor_id' => $user?->id,
@@ -597,22 +653,24 @@ public function workspace(Request $request, Transmittal $transmittal): View
             'recipients.*.name' => ['nullable', 'string', 'max:120'],
             'recipients.*.email' => ['required_if:intent,submit', 'nullable', 'email', 'max:255', 'distinct:ignore_case'],
             'recipients.*.organization' => ['nullable', 'string', 'max:160'],
-            'documents' => ['nullable', 'array', 'max:20'],
-            'documents.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
-            'supporting_attachments' => ['nullable', 'array', 'max:20'],
-            'supporting_attachments.*' => ['file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
+            'documents' => ['nullable', 'array', 'max:'.config('ordo.ocr.max_files', 50)],
+            'documents.*' => ['file', 'max:'.(int) ceil(config('ordo.upload.max_bytes') / 1024), 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
+            'supporting_attachments' => ['nullable', 'array', 'max:'.config('ordo.ocr.max_files', 50)],
+            'supporting_attachments.*' => ['file', 'max:'.(int) ceil(config('ordo.upload.max_bytes') / 1024), 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
             'categories' => ['nullable', 'array'],
             'categories.*' => ['required', Rule::in(['document', 'receipt', 'proof', 'attachment'])],
-            'ocr_tokens' => ['nullable', 'array', 'max:20'],
+            'ocr_tokens' => ['nullable', 'array', 'max:'.config('ordo.ocr.max_files', 50)],
             'ocr_tokens.*' => ['nullable', 'string', 'max:100000'],
             'items' => ['nullable', 'array', 'max:50'],
             'items.*.id' => ['nullable', 'integer'],
+            'items.*.document_id' => ['nullable', 'integer'],
+            'items.*.document_index' => ['nullable', 'integer', 'min:0'],
             'items.*.particular' => ['nullable', 'string', 'max:200'],
             'items.*.unique_id' => ['nullable', 'string', 'max:120'],
             'items.*.quantity' => ['nullable', 'string', 'max:40'],
             'items.*.description' => ['nullable', 'string', 'max:2000'],
             'items.*.remarks' => ['nullable', 'string', 'max:2000'],
-            'items.*.attachment' => ['nullable', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
+            'items.*.attachment' => ['nullable', 'file', 'max:'.(int) ceil(config('ordo.upload.max_bytes') / 1024), 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
         ]);
     }
 
@@ -667,10 +725,11 @@ public function workspace(Request $request, Transmittal $transmittal): View
         }
     }
 
-    private function storeDocuments(Transmittal $transmittal, Request $request, ?User $user, array $validated): void
+    private function storeDocuments(Transmittal $transmittal, Request $request, ?User $user, array $validated): array
     {
+        $storedDocuments = [];
         foreach ($request->file('documents', []) as $index => $file) {
-            $this->storeDocument(
+            $storedDocuments[$index] = $this->storeDocument(
                 $transmittal,
                 $user,
                 $file,
@@ -682,9 +741,17 @@ public function workspace(Request $request, Transmittal $transmittal): View
         foreach ($request->file('supporting_attachments', []) as $file) {
             $this->storeDocument($transmittal, $user, $file, 'attachment', null);
         }
+
+        return $storedDocuments;
     }
 
-    private function syncItems(Transmittal $transmittal, Request $request, ?User $user, array $validated): void
+    private function syncItems(
+        Transmittal $transmittal,
+        Request $request,
+        ?User $user,
+        array $validated,
+        array $uploadedDocuments = []
+    ): void
     {
         $existingItems = $transmittal->items()->get()->keyBy('id');
         $retainedIds = [];
@@ -692,6 +759,18 @@ public function workspace(Request $request, Transmittal $transmittal): View
         foreach ($validated['items'] ?? [] as $position => $data) {
             $item = isset($data['id']) ? $existingItems->get($data['id']) : null;
             $documentId = $item?->document_id;
+
+            if (filled($data['document_id'] ?? null)) {
+                $linkedDocument = $transmittal->documents()->whereKey($data['document_id'])->first();
+                abort_unless($linkedDocument, 404);
+                $documentId = $linkedDocument->id;
+            } elseif (! $documentId) {
+                $documentIndex = isset($data['document_index']) && is_numeric($data['document_index'])
+                    ? (int) $data['document_index']
+                    : $position;
+                $documentId = $uploadedDocuments[$documentIndex]->id ?? null;
+            }
+
             $file = $request->file("items.{$position}.attachment");
 
             if ($file instanceof UploadedFile) {
@@ -718,11 +797,13 @@ public function workspace(Request $request, Transmittal $transmittal): View
 
     private function canEditDraft(Request $request, Transmittal $transmittal): bool
 {
-    if (! in_array($transmittal->status, ['draft', 'pending_approval', 'rejected'], true)) {
+    if (! in_array($transmittal->status, ['draft', 'rejected'], true)) {
         return false;
     }
 
-    if ($request->user()?->canApproveTransmittals()) {
+    $user = $request->user();
+
+    if ($user?->canApproveTransmittals() || $transmittal->prepared_by === $user?->id) {
         return true;
     }
 
@@ -756,9 +837,16 @@ public function workspace(Request $request, Transmittal $transmittal): View
         }
 
         $canViewPrivateFiles = $this->canViewPrivateFiles($request, $transmittal);
+        $canViewAttachments = $this->canViewPrivateAttachments($request, $transmittal);
         $canManageLifecycle = $this->canManageLifecycle($request, $transmittal);
 
-        return view('transmittals.show', compact('transmittal', 'canEditDraft', 'canViewPrivateFiles', 'canManageLifecycle'));
+        // Recipient accounts may preview files addressed to them in the workspace,
+        // but must not enter the internal transmittal detail page.
+        if (! $canViewPrivateFiles && $canViewAttachments) {
+            return redirect()->route('transmittals.workspace', $transmittal);
+        }
+
+        return view('transmittals.show', compact('transmittal', 'canEditDraft', 'canViewPrivateFiles', 'canViewAttachments', 'canManageLifecycle'));
     }
 
     public function approve(Request $request, Transmittal $transmittal, TransmittalApprovalService $approval): RedirectResponse
@@ -834,8 +922,8 @@ public function workspace(Request $request, Transmittal $transmittal): View
             ]);
         });
 
-        return redirect()->route('transmittals.show', $transmittal)
-            ->with('status', 'Transmittal cancelled and recorded in its history.');
+        return redirect()->route('transmittals.index', ['filter' => 'archived'])
+            ->with('status', 'Transmittal archived and recorded in its history.');
     }
 
     public function destroy(Request $request, Transmittal $transmittal): RedirectResponse
@@ -1367,10 +1455,10 @@ public function transmit(
 
     public function download(Request $request, Transmittal $transmittal, int $document): StreamedResponse
     {
-
+        abort_unless($this->canViewPrivateAttachments($request, $transmittal), 404);
         $record = $transmittal->documents()->findOrFail($document);
 
-        return $this->streamDocument($transmittal, $record);
+        return $this->streamDocument($transmittal, $record, $request->boolean('download'));
     }
 
     public function downloadForRecipient(string $token, TransmittalDocument $document): StreamedResponse
@@ -1384,11 +1472,7 @@ public function transmit(
     public function pdf(Request $request, Transmittal $transmittal): Response
     {
         abort_unless($this->canViewPrivateFiles($request, $transmittal), 404);
-
         $transmittal->load(['preparer', 'approver', 'rejector', 'recipients', 'documents', 'items.document', 'proofs.recipient', 'receipts', 'histories']);
-        foreach ($transmittal->documents as $document) {
-            $this->verifyDocumentIntegrity($transmittal, $document);
-        }
 
         $pdf = Pdf::loadView('transmittals.pdf', compact('transmittal'))
             ->setPaper('a4');
@@ -1416,17 +1500,22 @@ public function transmit(
         return $this->renderReceiptPdf($recipient->transmittal, $record);
     }
 
-    private function streamDocument(Transmittal $transmittal, TransmittalDocument $record): StreamedResponse
+    private function streamDocument(Transmittal $transmittal, TransmittalDocument $record, bool $asDownload = false): StreamedResponse
     {
         abort_unless(Storage::disk('local')->exists($record->storage_path), 404);
         $this->verifyDocumentIntegrity($transmittal, $record);
 
-        // Ginamit natin ang inline para mag-preview ito sa browser sa halip na mag-download
-        $response = Storage::disk('local')->download($record->storage_path, $record->original_name);
-        $response->headers->set('Content-Disposition', 'inline; filename="' . $record->original_name . '"');
-        $response->headers->set('Cache-Control', 'private, no-store, max-age=0');
-        $response->headers->set('Pragma', 'no-cache');
-        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response = Storage::disk('local')->response(
+            $record->storage_path,
+            $record->original_name,
+            [
+                'Content-Type' => $record->mime_type ?: 'application/octet-stream',
+                'Cache-Control' => 'private, no-store, max-age=0',
+                'Pragma' => 'no-cache',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+            $asDownload ? 'attachment' : 'inline',
+        );
 
         return $response;
     }
@@ -1566,9 +1655,17 @@ private function storeDocument(
             || $this->canEditDraft($request, $transmittal);
     }
 
+    private function canViewPrivateAttachments(Request $request, Transmittal $transmittal): bool
+    {
+        return ($request->user()?->can('viewAttachments', $transmittal) ?? false)
+            || $this->canEditDraft($request, $transmittal);
+    }
+
     private function canManageLifecycle(Request $request, Transmittal $transmittal): bool
     {
-        if ($request->user()?->canApproveTransmittals()) {
+        $user = $request->user();
+
+        if ($user?->canApproveTransmittals() || $transmittal->prepared_by === $user?->id) {
             return true;
         }
 

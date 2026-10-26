@@ -43,7 +43,7 @@ class TransmittalWorkflowTest extends TestCase
             ->assertSee('data-document-preview-pane', false)
             ->assertSee('Confidentiality Notice')
             ->assertSee('List of Items');
-        $this->get(route('login'))->assertOk()->assertSee('Administrator sign in')->assertDontSee('Create account');
+        $this->get(route('login'))->assertOk()->assertSee('Sign in')->assertDontSee('Create account');
         $this->get('/login')->assertNotFound();
         $this->post('/register-first-administrator')->assertNotFound();
         $this->get('/team')->assertNotFound();
@@ -263,6 +263,76 @@ class TransmittalWorkflowTest extends TestCase
             'email' => 'final@example.test',
         ]);
         $this->get(route('transmittals.edit', $draft))->assertNotFound();
+    }
+
+    public function test_authenticated_client_can_save_and_submit_their_own_draft_without_a_browser_token(): void
+    {
+        $client = User::factory()->create(['transmittal_role' => 'client']);
+        $transmittal = $this->pendingTransmittal('ORDO-2026-CLIENTDRAFT');
+        $transmittal->forceFill([
+            'status' => 'draft',
+            'prepared_by' => $client->id,
+            'edit_token_hash' => hash('sha256', 'original-browser-token'),
+        ])->save();
+
+        $draftDetails = [
+            'intent' => 'draft',
+            'subject' => 'Client draft saved',
+            'purpose' => 'Prepare this transmittal for review.',
+            'direction' => 'send',
+            'transmittal_date' => '2026-10-23',
+            'origin_office' => 'Client Office',
+            'confidentiality' => 'standard',
+        ];
+
+        $this->actingAs($client)
+            ->put(route('transmittals.update', $transmittal), $draftDetails)
+            ->assertRedirect(route('transmittals.index', ['filter' => 'uploaded']));
+        $this->assertDatabaseHas('transmittals', [
+            'id' => $transmittal->id,
+            'subject' => 'Client draft saved',
+            'status' => 'draft',
+            'prepared_by' => $client->id,
+        ]);
+
+        $this->put(route('transmittals.update', $transmittal), [
+            ...$draftDetails,
+            'intent' => 'submit',
+            'recipients' => [[
+                'name' => 'Review Recipient',
+                'email' => 'review-recipient@example.test',
+                'organization' => 'Client Company',
+            ]],
+        ])->assertRedirect(route('transmittals.index', ['filter' => 'submitted']));
+        $this->assertDatabaseHas('transmittals', [
+            'id' => $transmittal->id,
+            'status' => 'pending_approval',
+        ]);
+    }
+
+    public function test_another_client_cannot_save_or_submit_someone_elses_draft(): void
+    {
+        $owner = User::factory()->create(['transmittal_role' => 'client']);
+        $otherClient = User::factory()->create(['transmittal_role' => 'client']);
+        $transmittal = $this->pendingTransmittal('ORDO-2026-CLIENTDRAFT2');
+        $transmittal->forceFill([
+            'status' => 'draft',
+            'prepared_by' => $owner->id,
+            'edit_token_hash' => hash('sha256', 'owners-browser-token'),
+        ])->save();
+
+        $this->actingAs($otherClient)
+            ->put(route('transmittals.update', $transmittal), [
+                'intent' => 'draft',
+                'subject' => 'Unauthorized change',
+                'purpose' => 'This should not be saved.',
+                'direction' => 'send',
+                'transmittal_date' => '2026-10-23',
+                'origin_office' => 'Other Client',
+                'confidentiality' => 'standard',
+            ])
+            ->assertNotFound();
+        $this->assertSame('Transmittal subject', $transmittal->fresh()->subject);
     }
 
     public function test_smart_upload_creates_a_session_protected_draft_and_workspace_saves_items_and_signatories(): void
@@ -660,8 +730,11 @@ class TransmittalWorkflowTest extends TestCase
             ->post(route('transmittals.recall', $transmittal), ['reason' => ''])
             ->assertSessionHasErrors('reason');
         $this->actingAs(User::factory()->create(['transmittal_role' => 'administrator']))
+            ->post(route('transmittals.cancel', $transmittal), ['reason' => ''])
+            ->assertSessionHasErrors('reason');
+        $this->actingAs(User::factory()->create(['transmittal_role' => 'administrator']))
             ->post(route('transmittals.cancel', $transmittal), ['reason' => 'Cancelled at request of submitter.'])
-            ->assertRedirect(route('transmittals.show', $transmittal));
+            ->assertRedirect(route('transmittals.index', ['filter' => 'archived']));
 
         $this->assertSame('cancelled', $transmittal->fresh()->status);
         $this->assertSame('pending_approval', $transmittal->fresh()->cancelled_from_status);
@@ -670,6 +743,78 @@ class TransmittalWorkflowTest extends TestCase
             'transmittal_id' => $transmittal->id,
             'action' => 'cancelled',
         ]);
+    }
+
+    public function test_draft_owner_can_cancel_once_and_cancellation_is_recorded(): void
+    {
+        Storage::fake('local');
+        $transmittal = $this->pendingTransmittal('ORDO-2026-CANCEL01');
+        $transmittal->forceFill(['status' => 'draft'])->save();
+        $token = str_repeat('owner-token-', 6);
+        $transmittal->forceFill(['edit_token_hash' => hash('sha256', $token)])->save();
+        $uploader = User::factory()->create();
+        $contents = 'retained attachment';
+        $documentPath = "transmittals/{$transmittal->id}/retained.pdf";
+        Storage::disk('local')->put($documentPath, $contents);
+        $document = $transmittal->documents()->create([
+            'uploaded_by' => $uploader->id,
+            'original_name' => 'retained.pdf',
+            'storage_path' => $documentPath,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($contents),
+            'sha256' => hash('sha256', $contents),
+        ]);
+        $recipient = $transmittal->recipients()->firstOrFail();
+        $proof = $transmittal->proofs()->create([
+            'recipient_id' => $recipient->id,
+            'channel' => 'manual',
+            'status' => 'uploaded',
+        ]);
+        $receipt = $transmittal->receipts()->create([
+            'recipient_id' => $recipient->id,
+            'signed_name' => 'Recipient',
+            'receipt_code' => 'RECEIPT-CANCEL-01',
+            'snapshot' => ['tracking_number' => $transmittal->tracking_number],
+            'received_at' => now(),
+        ]);
+
+        $this->withSession(['transmittal_draft_tokens' => [$transmittal->id => $token]])
+            ->get(route('transmittals.workspace', $transmittal))
+            ->assertOk()
+            ->assertSee('Print / save PDF')
+            ->assertDontSee('Cancel transmittal')
+            ->assertSee('data-attachment-browser', false)
+            ->assertSee('retained.pdf')
+            ->assertSee('class="action-panel-button danger" type="submit">Cancel</button>', false);
+
+        $this->withSession(['transmittal_draft_tokens' => [$transmittal->id => $token]])
+            ->post(route('transmittals.cancel', $transmittal), ['reason' => 'Duplicate draft created.'])
+            ->assertRedirect(route('transmittals.index', ['filter' => 'archived']))
+            ->assertSessionHas('status');
+
+        $cancelled = $transmittal->fresh();
+        $this->assertSame('cancelled', $cancelled->status);
+        $this->assertSame('draft', $cancelled->cancelled_from_status);
+        $this->assertNotNull($cancelled->cancelled_at);
+        $this->assertSame('Duplicate draft created.', $cancelled->cancellation_reason);
+        $this->assertDatabaseHas('transmittal_histories', [
+            'transmittal_id' => $transmittal->id,
+            'actor_id' => null,
+            'action' => 'cancelled',
+        ]);
+        $this->assertSame(
+            ['reason' => 'Duplicate draft created.', 'previous_status' => 'draft'],
+            $cancelled->histories()->where('action', 'cancelled')->firstOrFail()->metadata,
+        );
+        $this->assertDatabaseHas('transmittal_documents', ['id' => $document->id]);
+        $this->assertDatabaseHas('proof_of_transmissions', ['id' => $proof->id]);
+        $this->assertDatabaseHas('transmittal_receipts', ['id' => $receipt->id]);
+        Storage::disk('local')->assertExists($documentPath);
+
+        $this->withSession(['transmittal_draft_tokens' => [$transmittal->id => $token]])
+            ->post(route('transmittals.cancel', $transmittal), ['reason' => 'Try to cancel twice.'])
+            ->assertStatus(409);
+        $this->assertSame(1, $cancelled->histories()->where('action', 'cancelled')->count());
     }
 
     public function test_soft_delete_restore_and_permanent_delete_preserve_lifecycle_audit_archive(): void
@@ -936,18 +1081,23 @@ class TransmittalWorkflowTest extends TestCase
             ->assertSee('Missing recipient details.');
     }
 
-    public function test_administrator_login_does_not_allow_regular_users_and_has_no_signup_flow(): void
+    public function test_client_accounts_can_sign_in_but_only_administrators_can_decide_submissions(): void
     {
         $regularUser = User::factory()->create([
             'email' => 'user@example.test',
             'password' => 'correct-horse-battery',
-            'transmittal_role' => 'preparer',
+            'transmittal_role' => 'client',
         ]);
+        $transmittal = $this->pendingTransmittal('ORDO-2026-CLIENT001');
 
         $this->post(route('login.store'), [
             'email' => $regularUser->email,
             'password' => 'correct-horse-battery',
-        ])->assertSessionHasErrors('email');
+        ])->assertRedirect(route('transmittals.index'));
+        $this->assertAuthenticatedAs($regularUser);
+        $this->post(route('transmittals.approve', $transmittal))->assertForbidden();
+        $this->assertSame('pending_approval', $transmittal->fresh()->status);
+        $this->post(route('logout'))->assertRedirect(route('login'));
 
         $administrator = User::factory()->create([
             'email' => 'admin@example.test',
@@ -961,6 +1111,59 @@ class TransmittalWorkflowTest extends TestCase
         ])->assertRedirect(route('transmittals.index'));
 
         $this->assertAuthenticatedAs($administrator);
+    }
+
+    public function test_client_can_preview_only_attachments_addressed_to_their_account(): void
+    {
+        Storage::fake('local');
+        $client = User::factory()->create([
+            'email' => 'client@example.test',
+            'transmittal_role' => 'client',
+        ]);
+        $transmittal = $this->pendingTransmittal('ORDO-2026-CLIENT002');
+        $recipient = $transmittal->recipients()->firstOrFail();
+        $recipient->forceFill(['email' => $client->email])->save();
+        $path = "transmittals/{$transmittal->id}/client-document.pdf";
+        $contents = 'client attachment content';
+        Storage::disk('local')->put($path, $contents);
+        $document = $transmittal->documents()->create([
+            'original_name' => 'client-document.pdf',
+            'storage_path' => $path,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => strlen($contents),
+            'sha256' => hash('sha256', $contents),
+        ]);
+
+        $this->actingAs($client)
+            ->get(route('transmittals.workspace', $transmittal))
+            ->assertOk()
+            ->assertSee('data-attachment-browser', false)
+            ->assertSee('client-document.pdf');
+        $this->get(route('transmittals.show', $transmittal))
+            ->assertRedirect(route('transmittals.workspace', $transmittal));
+        $this->get(route('transmittals.documents.download', [$transmittal, $document]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'inline; filename=client-document.pdf');
+        $this->get(route('transmittals.pdf', $transmittal))->assertNotFound();
+        $this->post(route('transmittals.approve', $transmittal))->assertForbidden();
+        $this->post(route('transmittals.reject', $transmittal), [
+            'rejection_reason' => 'Clients cannot decide submissions.',
+        ])->assertForbidden();
+        $this->assertSame('pending_approval', $transmittal->fresh()->status);
+
+        $otherTransmittal = $this->pendingTransmittal('ORDO-2026-CLIENT003');
+        $otherPath = "transmittals/{$otherTransmittal->id}/private.pdf";
+        Storage::disk('local')->put($otherPath, 'not this client');
+        $otherDocument = $otherTransmittal->documents()->create([
+            'original_name' => 'private.pdf',
+            'storage_path' => $otherPath,
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 15,
+            'sha256' => hash('sha256', 'not this client'),
+        ]);
+        $this->get(route('transmittals.documents.download', [$otherTransmittal, $otherDocument]))
+            ->assertNotFound();
     }
 
     public function test_brevo_notice_and_recipient_acknowledgment_are_auditable(): void
