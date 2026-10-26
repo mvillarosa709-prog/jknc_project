@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.transmittal')
 
 @section('title', $transmittal->tracking_number)
 @section('eyebrow', $transmittal->tracking_number)
