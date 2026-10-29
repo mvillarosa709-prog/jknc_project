@@ -27,6 +27,7 @@ return [
         'api_key' => env('BREVO_API_KEY'),
         'sender_email' => env('BREVO_SENDER_EMAIL'),
         'sender_name' => env('BREVO_SENDER_NAME', env('APP_NAME', 'ORDO Transmittal')),
-        'acknowledgment_days' => (int) env('ORDO_ACKNOWLEDGMENT_DAYS', 30),
+        'acknowledgment_days' => (int) env('ORDO_ACKNOWLEDGMENT_DAYS', 3),
+        'acknowledgment_hours' => (int) env('ORDO_ACKNOWLEDGMENT_HOURS', 72),
     ],
 ];

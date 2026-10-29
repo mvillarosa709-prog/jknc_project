@@ -1,5 +1,6 @@
 @php
-    $isEditing = $transmittal instanceof \App\Models\Transmittal;
+    $transmittal = $transmittal ?? new \App\Models\Transmittal();
+    $isEditing = $transmittal->exists;
     $workspace = $workspace ?? false;
     $direction = old('direction', $transmittal->direction ?? 'send');
     $formRecipients = old('recipients', $isEditing
@@ -69,18 +70,17 @@
                 </div>
             @endif
 
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb;">
-    <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827;">{{ $isEditing ? 'Edit Transmittal' : 'Add Transmittal' }}</h3>
-    <button type="button" data-close-drawer style="background: none; border: none; font-size: 18px; color: #6b7280; cursor: pointer; padding: 0;">&times;</button>
-</div>
             <label>Ref #
                 <input value="{{ $isEditing ? $transmittal->tracking_number : 'AUTO-INCREMENT' }}" readonly aria-label="Reference number">
+                <p class="field-hint" style="margin-top: 4px; font-size: 11px; color: #8794a8;">Date is automatically set to today when saved.</p>
             </label>
-            <div class="drawer-field-row">
+            <div>
                 <label>Date <span class="required">*</span>
                     <input type="date" name="transmittal_date" value="{{ old('transmittal_date', $isEditing ? $transmittal->transmittal_date?->format('Y-m-d') : now()->format('Y-m-d')) }}" required data-preview="date">
                     @error('transmittal_date')<span class="field-error">{{ $message }}</span>@enderror
                 </label>
+            </div>
+            <div>
                 <label>Mode <span class="required">*</span>
                     <select name="direction" required data-preview="direction">
                         <option value="send" @selected($direction === 'send')>SEND</option>
@@ -88,106 +88,100 @@
                     </select>
                     @error('direction')<span class="field-error">{{ $message }}</span>@enderror
                 </label>
+                <p class="field-hint" data-mode-description style="margin-top: 4px; font-size: 11px; color: #8794a8;">{{ $direction === 'receive' ? 'Incoming transmittal' : 'Outgoing transmittal' }}</p>
             </div>
+
+            <input type="hidden" name="subject" value="{{ old('subject', $transmittal->subject ?: 'Transmittal Form') }}" id="subject-field" data-preview="subject">
+            <input type="hidden" name="related_company" value="{{ old('related_company', $transmittal->related_company ?? '') }}" data-preview="related-company">
+            <input type="hidden" name="confidentiality" value="{{ old('confidentiality', $transmittal->confidentiality ?? 'standard') }}" data-preview="confidentiality">
+            <input type="hidden" name="purpose" value="{{ old('purpose', $transmittal->purpose ?? 'Official Transmittal') }}" data-preview="purpose">
             <label><span data-counterparty-label>{{ $direction === 'receive' ? 'From' : 'To' }}</span>
-                <input name="recipients[0][name]" value="{{ old('recipients.0.name', $formRecipients[0]['name'] ?? '') }}" placeholder="Recipient name" data-preview="recipient">
+                <input name="recipients[0][name]" value="{{ old('recipients.0.name', $formRecipients[0]['name'] ?? '') }}" placeholder="{{ $direction === 'receive' ? 'Enter external sender / source' : 'Enter external receiver / destination' }}" data-preview="recipient">
                 @error('recipients.0.name')<span class="field-error">{{ $message }}</span>@enderror
             </label>
             <label><span data-office-label>{{ $direction === 'receive' ? 'To (Office)' : 'From (Office)' }}</span> <span class="required">*</span>
-                <input name="origin_office" value="{{ old('origin_office', $transmittal->origin_office ?? config('ordo.office_name')) }}" required maxlength="160" data-preview="office">
+                <input name="origin_office" value="{{ old('origin_office', $transmittal->origin_office ?? config('ordo.office_name')) }}" required maxlength="160" placeholder="{{ $direction === 'receive' ? 'Enter office receiving the transmittal' : 'Enter office sending the transmittal' }}" data-preview="office">
                 @error('origin_office')<span class="field-error">{{ $message }}</span>@enderror
             </label>
             <label>Address
-                <textarea name="recipient_address" rows="2" placeholder="Recipient mailing address" data-preview="address">{{ old('recipient_address', $transmittal->recipient_address ?? '') }}</textarea>
+                <textarea name="recipient_address" rows="3" placeholder="Enter address" data-preview="address">{{ old('recipient_address', $transmittal->recipient_address ?? '') }}</textarea>
                 @error('recipient_address')<span class="field-error">{{ $message }}</span>@enderror
             </label>
-            <div class="drawer-field-row">
-                <label>Recipient Email <span class="required">*</span>
-                    <input type="email" name="recipients[0][email]" value="{{ old('recipients.0.email', $formRecipients[0]['email'] ?? '') }}" placeholder="name@company.com" data-preview="recipient-email">
-                    @error('recipients')<span class="field-error">{{ $message }}</span>@enderror
-                    @error('recipients.0.email')<span class="field-error">{{ $message }}</span>@enderror
-                </label>
-                <label>Related Client / Company
-                    <input name="related_company" value="{{ old('related_company', $transmittal->related_company ?? '') }}" maxlength="160" data-preview="related-company">
-                    @error('related_company')<span class="field-error">{{ $message }}</span>@enderror
-                </label>
-            </div>
-            <hr class="drawer-divider">
-            <h3>Delivery</h3>
-            <label>Delivery Type <span class="required">*</span>
-                    @php
-                        $deliveryTypeOptions = [
-                            'by_person' => 'By Person',
-                            'registered_mail' => 'Registered Mail',
-                            'electronic' => 'Electronic',
-                        ];
-                        $selectedDeliveryType = old('delivery_type', $transmittal->delivery_type ?? 'by_person');
-                        if (! array_key_exists($selectedDeliveryType, $deliveryTypeOptions)) {
-                            $deliveryTypeOptions[$selectedDeliveryType] = str($selectedDeliveryType)->replace('_', ' ')->title();
-                        }
-                    @endphp
-                    <select name="delivery_type" data-preview="delivery-type" required>
-                        @foreach ($deliveryTypeOptions as $value => $label)
-                            <option value="{{ $value }}" @selected($selectedDeliveryType === $value)>{{ $label }}</option>
-                        @endforeach
+
+            <div class="drawer-divider"></div>
+
+            <section class="drawer-section">
+                <h3>Delivery Type</h3>
+                @php
+                    $deliveryType = old('delivery_type', $transmittal->delivery_type ?? 'by_person');
+                    $deliveryMethod = old('delivery_method', $transmittal->delivery_method ?? 'electronic');
+                @endphp
+                <label>Type
+                    <select name="delivery_type" id="drawer-delivery-type" data-preview="delivery-type">
+                        <option value="">Select delivery type</option>
+                        <option value="by_person" @selected($deliveryType === 'by_person')>By Person</option>
+                        <option value="registered_mail" @selected($deliveryType === 'registered_mail')>Registered Mail</option>
+                        <option value="electronic" @selected($deliveryType === 'electronic')>Electronic</option>
                     </select>
-            </label>
-            @php($selectedActions = old('delivery_actions', $transmittal->delivery_actions ?? ['email']))
-            <fieldset class="delivery-actions">
-                <legend>Actions</legend>
-                @foreach (['delivery' => 'Delivery', 'pick_up' => 'Pick Up', 'drop_off' => 'Drop Off', 'email' => 'Email'] as $value => $label)
-                    <label><input type="checkbox" name="delivery_actions[]" value="{{ $value }}" @checked(in_array($value, $selectedActions, true))> {{ $label }}</label>
-                @endforeach
-            </fieldset>
-            <div id="recipient-list" class="recipient-list additional-recipients">
-                @foreach (array_slice($formRecipients, 1, 19) as $index => $recipient)
-                    <div class="recipient-row">
-                        <div class="recipient-number">{{ str_pad((string) ($index + 2), 2, '0', STR_PAD_LEFT) }}</div>
-                        <label>Name<input name="recipients[{{ $index + 1 }}][name]" value="{{ old('recipients.'.($index + 1).'.name', $recipient['name'] ?? '') }}" placeholder="Recipient name"></label>
-                        <label>Email<input type="email" name="recipients[{{ $index + 1 }}][email]" value="{{ old('recipients.'.($index + 1).'.email', $recipient['email'] ?? '') }}" placeholder="name@company.com"></label>
-                        <label>Organization<input name="recipients[{{ $index + 1 }}][organization]" value="{{ old('recipients.'.($index + 1).'.organization', $recipient['organization'] ?? '') }}" placeholder="Company"></label>
-                        <button class="remove-recipient" type="button" aria-label="Remove recipient">×</button>
-                    </div>
-                @endforeach
-            </div>
-            <template id="recipient-row-template">
-                <div class="recipient-row">
-                    <div class="recipient-number">02</div>
-                    <label>Name<input name="recipients[1][name]" placeholder="Recipient name"></label>
-                    <label>Email<input type="email" name="recipients[1][email]" placeholder="name@company.com"></label>
-                    <label>Organization<input name="recipients[1][organization]" placeholder="Company"></label>
-                    <button class="remove-recipient" type="button" aria-label="Remove recipient">×</button>
+                    @error('delivery_type')<span class="field-error">{{ $message }}</span>@enderror
+                </label>
+
+                <div id="drawer-by-person-block" style="{{ $deliveryType === 'by_person' ? '' : 'display: none;' }}">
+                    <label>Who?
+                        <input type="text" name="delivered_by" value="{{ old('delivered_by', $transmittal->delivered_by ?? '') }}" placeholder="Enter person responsible" data-preview="delivered-by">
+                        @error('delivered_by')<span class="field-error">{{ $message }}</span>@enderror
+                    </label>
                 </div>
-            </template>
-            <button class="text-button" type="button" id="add-recipient">＋ Add another recipient</button>
-            <div class="drawer-section">
-                <h3>Transmittal details</h3>
-                <label>Subject <span class="required">*</span>
-                    <input name="subject" id="subject-field" value="{{ old('subject', $transmittal->subject ?? '') }}" placeholder="Document package or transmittal subject" required maxlength="200" data-preview="subject">
-                    @error('subject')<span class="field-error">{{ $message }}</span>@enderror
-                </label>
-                <label>Document reference
-                    <input name="external_reference" id="reference-field" value="{{ old('external_reference', $transmittal->external_reference ?? '') }}" placeholder="Reference number detected by OCR" maxlength="120" data-preview="reference">
-                    @error('external_reference')<span class="field-error">{{ $message }}</span>@enderror
-                </label>
-                <label>Purpose <span class="required">*</span>
-                    <textarea name="purpose" rows="3" placeholder="Describe what is being transmitted and any action required" required data-preview="purpose">{{ old('purpose', $transmittal->purpose ?? '') }}</textarea>
-                    @error('purpose')<span class="field-error">{{ $message }}</span>@enderror
-                </label>
-                <label>Confidentiality
-                    <select name="confidentiality" data-preview="confidentiality">
-                        @foreach (['standard' => 'Standard', 'confidential' => 'Confidential', 'restricted' => 'Restricted'] as $value => $label)
-                            <option value="{{ $value }}" @selected(old('confidentiality', $transmittal->confidentiality ?? 'standard') === $value)>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </label>
-            </div>
+
+                <div id="drawer-registered-mail-block" style="{{ $deliveryType === 'registered_mail' ? '' : 'display: none;' }}">
+                    <label>Courier / Provider
+                        <select name="registered_mail_provider" data-preview="courier-provider">
+                            <option value="">Select provider</option>
+                            @foreach (['LBC', 'J&T', 'Postal', 'Others'] as $provider)
+                                <option value="{{ $provider }}" @selected(old('registered_mail_provider', $transmittal->external_reference ?? '') === $provider)>{{ $provider }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+
+                <div id="drawer-electronic-block" style="{{ $deliveryType === 'electronic' ? '' : 'display: none;' }}">
+                    <label>Electronic Method
+                        <select name="delivery_method" data-preview="delivery-method">
+                            <option value="">Select method</option>
+                            <option value="electronic" @selected($deliveryMethod === 'electronic')>Email</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div id="drawer-recipient-email-block" style="{{ $deliveryType === 'electronic' || $workspace || $isEditing ? '' : 'display: none;' }}">
+                    <label>Recipient Email
+                        <input type="email" name="recipients[0][email]" value="{{ old('recipients.0.email', $formRecipients[0]['email'] ?? '') }}" placeholder="Enter email address" data-preview="recipient-email">
+                        @error('recipients.0.email')<span class="field-error">{{ $message }}</span>@enderror
+                    </label>
+                </div>
+            </section>
+
+            <div class="drawer-divider"></div>
+
+            <section class="drawer-section">
+                <h3>Actions</h3>
+                @php($selectedActions = old('delivery_actions', $transmittal->delivery_actions ?? ['email']))
+                <fieldset class="delivery-actions">
+                    <legend>Actions</legend>
+                    @foreach (['delivery' => 'Delivery', 'pick_up' => 'Pick Up', 'drop_off' => 'Drop Off', 'email' => 'Email'] as $value => $label)
+                        <label><input type="checkbox" name="delivery_actions[]" value="{{ $value }}" @checked(in_array($value, $selectedActions, true))> {{ $label }}</label>
+                    @endforeach
+                </fieldset>
+            </section>
+
+
+
             <section class="drawer-section item-section">
                 <div class="item-section-heading">
-                    <h3>List of Items</h3>
+                    <label class="block text-xs font-semibold text-gray-500" style="font-size: 13px; font-weight: 600; color: #1f2937;">List of Items</label>
                     <button class="button primary" type="button" id="add-item">＋ Add Row</button>
                 </div>
-                <div id="item-list">
+                <div id="item-list" style="display: flex; flex-direction: column; gap: 12px;">
                     @foreach ($formItems as $index => $item)
                         <fieldset class="item-editor-row">
                             <legend>Item {{ $loop->iteration }}<button class="remove-item text-button" type="button">Remove</button></legend>
@@ -195,7 +189,7 @@
                             <label>Particular<input name="items[{{ $index }}][particular]" value="{{ $item['particular'] ?? '' }}" maxlength="200" placeholder="Item name"></label>
                             <div class="drawer-field-row">
                                 <label>Unique ID<input name="items[{{ $index }}][unique_id]" value="{{ $item['unique_id'] ?? '' }}" maxlength="120" placeholder="ID / serial"></label>
-                                <label>Qty<input type="number" min="0" step="any" name="items[{{ $index }}][quantity]" value="{{ $item['quantity'] ?? '' }}" maxlength="40" placeholder="Quantity"></label>
+                                <label>Qty.<input type="number" min="0" step="any" name="items[{{ $index }}][quantity]" value="{{ $item['quantity'] ?? '' }}" maxlength="40" placeholder="Quantity"></label>
                             </div>
                             @if ($isEditing && !empty($item['id']) && ($linkedItem = $transmittal->items->firstWhere('id', $item['id']))?->document)
                                 <small class="item-file-existing">Attached: <a href="{{ route('transmittals.documents.download', [$transmittal, $linkedItem->document]) }}">{{ $linkedItem->document->original_name }}</a></small>
@@ -216,7 +210,7 @@
                         <label>Particular<input name="items[0][particular]" maxlength="200" placeholder="Item name"></label>
                         <div class="drawer-field-row">
                             <label>Unique ID<input name="items[0][unique_id]" maxlength="120" placeholder="ID / serial"></label>
-                            <label>Qty<input type="number" min="0" step="any" name="items[0][quantity]" maxlength="40" placeholder="Quantity"></label>
+                            <label>Qty.<input type="number" min="0" step="any" name="items[0][quantity]" maxlength="40" placeholder="Quantity"></label>
                         </div>
                         <label>Description<input name="items[0][description]" maxlength="2000" placeholder="Description"></label>
                         <label>Remarks<input name="items[0][remarks]" maxlength="2000" placeholder="Remarks"></label>
@@ -227,19 +221,25 @@
                     </fieldset>
                 </template>
             </section>
-                <section class="drawer-section supporting-attachments-section">
-                    <h3>Supporting Attachments</h3>
-                    @if ($isEditing && $transmittal->documents->isNotEmpty())
-                        <div class="existing-files">
-                            @foreach ($transmittal->documents as $document)
-                                <a href="{{ route('transmittals.documents.download', [$transmittal, $document]) }}">{{ $document->original_name }} · {{ ucfirst($document->category) }}</a>
-                            @endforeach
-                        </div>
-                    @endif
-                    <input type="file" name="supporting_attachments[]" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-supporting-attachments data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}">
-                    <small class="file-selection-name" data-supporting-file-names>No file selected</small>
-                    <p class="field-hint">You may upload multiple supporting files. These will be attached when using Send Email.</p>
-                </section>
+
+            <div class="drawer-divider"></div>
+
+            <section class="drawer-section supporting-attachments-section">
+                <h3>Supporting Attachments</h3>
+                @if ($isEditing && $transmittal->documents->isNotEmpty())
+                    <div class="existing-files">
+                        @foreach ($transmittal->documents as $document)
+                            <a href="{{ route('transmittals.documents.download', [$transmittal, $document]) }}">{{ $document->original_name }} · {{ ucfirst($document->category) }}</a>
+                        @endforeach
+                    </div>
+                @endif
+                <input type="file" name="supporting_attachments[]" multiple accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.doc,.docx" data-supporting-attachments data-upload-max-bytes="{{ config('ordo.upload.max_bytes') }}">
+                <small class="file-selection-name" data-supporting-file-names>No file selected</small>
+                <p class="field-hint">You may upload multiple supporting files. These will be attached when using Send Email.</p>
+            </section>
+
+            <div class="drawer-divider"></div>
+
             <section class="drawer-section">
                 <h3>Signatories</h3>
                 <label>Prepared by<input value="{{ $transmittal?->prepared_by_name ?: (auth()->user()?->name ?? 'Public submitter') }}" readonly data-preview="prepared-by"></label>

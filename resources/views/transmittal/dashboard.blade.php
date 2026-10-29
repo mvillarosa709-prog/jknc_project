@@ -66,6 +66,20 @@
                     </a>
                 @endforeach
             </div>
+
+            {{-- SEARCH BAR (MATCHING SS2 PILL SHAPE) --}}
+            <div class="py-4">
+                <div class="relative w-full">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                    <input
+                        id="dashboardTransmittalSearch"
+                        type="text"
+                        placeholder="Search"
+                        oninput="filterDashboardTable(this.value)"
+                        class="w-full bg-gray-100 focus:bg-white border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-full pl-11 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition"
+                    >
+                </div>
+            </div>
         </div>
 
         <div class="overflow-x-auto">
@@ -165,4 +179,26 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+function filterDashboardTable(query) {
+    const term = (query || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('tbody tr');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        // skip empty placeholder row
+        if (row.querySelector('td[colspan]')) return;
+        const text = row.innerText.toLowerCase();
+        if (!term || text.includes(term)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+</script>
+@endpush
 @endsection

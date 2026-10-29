@@ -11,7 +11,10 @@ class TransmittalReceipt extends Model
     protected $fillable = [
         'transmittal_id',
         'recipient_id',
+        'receipt_no',
+        'receipt_date',
         'signed_name',
+        'received_by',
         'comments',
         'receipt_code',
         'snapshot',

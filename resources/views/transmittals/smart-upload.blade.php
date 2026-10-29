@@ -9,7 +9,7 @@
        SMART UPLOAD ROOT & STYLES
     ============================== */
     .smart-upload-container {
-        width: min(100%, 1000px);
+        width: min(100%, 1240px);
         min-width: 0;
         margin-inline: auto;
         padding-bottom: 48px;
@@ -22,7 +22,7 @@
         gap: 16px;
         width: 100%;
         margin: 0 0 18px;
-        padding: 20px 22px;
+        padding: 22px 26px;
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
@@ -34,12 +34,12 @@
         align-items: center;
         gap: 6px;
         margin-bottom: 8px;
-        padding: 3px 9px;
+        padding: 4px 11px;
         background: #eff6ff;
         border: 1px solid #dbeafe;
         border-radius: 20px;
         color: #1d4ed8;
-        font-size: 11px;
+        font-size: 13px;
         font-weight: 700;
         letter-spacing: .6px;
         text-transform: uppercase;
@@ -47,17 +47,18 @@
 
     .smart-upload-title h1 {
         margin: 0 0 6px;
-        color: #0f172a;
-        font-size: 26px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        line-height: 1.25;
+        color: #1f2937;
+        font-size: 30px;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+        line-height: 1;
+        font-family: inherit;
     }
 
     .smart-upload-title .muted {
         margin: 0;
         color: #64748b;
-        font-size: 13px;
+        font-size: 15px;
         line-height: 1.5;
     }
 
@@ -158,7 +159,7 @@
         gap: 10px;
         margin: 0;
         color: #0f172a;
-        font-size: 16px;
+        font-size: 19px;
         font-weight: 700;
     }
 
@@ -166,18 +167,18 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
+        width: 32px;
+        height: 32px;
         color: #111827;
         background: #f1f3f7;
         border-radius: 8px;
-        font-size: 14px;
+        font-size: 16px;
     }
 
     .panel-section-title p {
         margin: 3px 0 0;
         color: #64748b;
-        font-size: 12px;
+        font-size: 14px;
     }
 
     /* Actions toolbar */
@@ -185,10 +186,10 @@
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         align-items: center;
-        gap: 8px;
+        gap: 10px;
         margin-bottom: 0;
         min-width: 0;
-        width: min(100%, 470px);
+        width: min(100%, 540px);
         max-width: 100%;
         box-sizing: border-box;
         padding: 2px 0;
@@ -198,11 +199,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        min-height: 34px;
-        padding: 6px 7px;
+        gap: 6px;
+        min-height: 38px;
+        padding: 7px 10px;
         white-space: nowrap;
-        font-size: 10px;
+        font-size: 13px;
         font-weight: 600;
         border-radius: 8px;
         cursor: pointer;
@@ -257,14 +258,22 @@
         color: #0f172a;
     }
 
-    .btn-toolbar-purple {
-        background: #f5f3ff;
-        border-color: #ddd6fe;
-        color: #6d28d9;
+    .btn-toolbar-purple,
+    .btn-toolbar-blue {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
     }
-    .btn-toolbar-purple:hover {
-        background: #ede9fe;
-        border-color: #c4b5fd;
+    .btn-toolbar-purple:hover,
+    .btn-toolbar-blue:hover {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+        color: #ffffff;
+    }
+    .btn-toolbar-purple .btn-toolbar-icon,
+    .btn-toolbar-blue .btn-toolbar-icon {
+        background: #1e40af;
+        color: #ffffff;
     }
 
     .btn-toolbar-danger {
@@ -333,13 +342,13 @@
 
     .smart-drop-zone strong {
         color: #0f172a;
-        font-size: 15px;
+        font-size: 17px;
         font-weight: 700;
     }
 
     .smart-drop-zone .drop-hint {
         color: #64748b;
-        font-size: 12px;
+        font-size: 14px;
     }
 
     .smart-drop-zone .drop-hint u {
@@ -350,7 +359,7 @@
 
     .smart-drop-zone .drop-limits {
         color: #94a3b8;
-        font-size: 11px;
+        font-size: 13px;
     }
 
     .smart-drop-zone input[type="file"] {
@@ -368,7 +377,7 @@
     ============================== */
     .progress-container {
         margin: 16px 0;
-        padding: 14px 18px;
+        padding: 16px 20px;
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
@@ -379,14 +388,14 @@
         align-items: center;
         justify-content: space-between;
         margin-bottom: 8px;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: 600;
         color: #334155;
     }
 
     .progress-track {
         width: 100%;
-        height: 7px;
+        height: 8px;
         background: #e2e8f0;
         border-radius: 10px;
         overflow: hidden;
@@ -401,8 +410,8 @@
     }
 
     .progress-status-msg {
-        margin-top: 6px;
-        font-size: 11px;
+        margin-top: 8px;
+        font-size: 13px;
         color: #64748b;
     }
     .progress-status-msg.error {
@@ -416,7 +425,7 @@
     .files-queue-list {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
         margin-top: 16px;
     }
 
@@ -425,7 +434,7 @@
         align-items: center;
         justify-content: space-between;
         gap: 14px;
-        padding: 12px 16px;
+        padding: 14px 18px;
         background: #ffffff;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
@@ -440,7 +449,7 @@
     .file-card-main {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
         min-width: 0;
         flex: 1;
     }
@@ -449,11 +458,11 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         flex-shrink: 0;
         border-radius: 8px;
-        font-size: 10px;
+        font-size: 12px;
         font-weight: 800;
         letter-spacing: .5px;
         text-transform: uppercase;
@@ -471,7 +480,7 @@
 
     .file-meta-name {
         margin: 0;
-        font-size: 13px;
+        font-size: 15px;
         font-weight: 600;
         color: #0f172a;
         white-space: nowrap;
@@ -483,25 +492,25 @@
         display: flex;
         align-items: center;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 3px;
-        font-size: 11px;
+        gap: 10px;
+        margin-top: 4px;
+        font-size: 13px;
         color: #64748b;
     }
 
     .file-card-actions {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
         flex-shrink: 0;
     }
 
     .file-category-select {
-        min-height: 32px;
-        padding: 4px 10px;
+        min-height: 36px;
+        padding: 6px 12px;
         border: 1px solid #dbe3ef;
-        border-radius: 7px;
-        font-size: 11px;
+        border-radius: 8px;
+        font-size: 13px;
         font-weight: 600;
         color: #334155;
         background: #ffffff;
@@ -515,13 +524,13 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 30px;
-        height: 30px;
+        width: 32px;
+        height: 32px;
         border: 1px solid transparent;
         border-radius: 7px;
         background: transparent;
         color: #94a3b8;
-        font-size: 16px;
+        font-size: 18px;
         cursor: pointer;
         transition: all .15s ease;
     }
@@ -538,18 +547,21 @@
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 2px 7px;
+        padding: 3px 9px;
         border-radius: 6px;
-        font-size: 10px;
-        font-weight: 700;
+        font-size: 12px;
+        font-weight: 600;
         letter-spacing: .3px;
         text-transform: uppercase;
     }
 
-    .badge-confidence.ocr {
+    .badge-confidence.ocr,
+    .badge-confidence.filename,
+    .badge-confidence.review {
         background: #eff6ff;
         color: #2563eb;
         border: 1px solid #bfdbfe;
+        font-weight: 550;
     }
 
     .badge-confidence.matched {
@@ -559,15 +571,10 @@
     }
 
     .badge-confidence.autofilled {
-        background: #f0fdf4;
-        color: #16a34a;
-        border: 1px solid #bbf7d0;
-    }
-
-    .badge-confidence.review {
-        background: #fffbeb;
-        color: #d97706;
-        border: 1px solid #fde68a;
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #bfdbfe;
+        font-weight: 550;
     }
 
     .badge-confidence.duplicate {
@@ -591,23 +598,25 @@
     .items-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 12px;
+        font-size: 14px;
         text-align: left;
     }
 
     .items-table th {
         background: #f8fafc;
-        padding: 10px 12px;
+        padding: 12px 14px;
         font-weight: 700;
         color: #475569;
+        font-size: 13px;
         border-bottom: 1px solid #e2e8f0;
         white-space: nowrap;
     }
 
     .items-table td {
-        padding: 8px 10px;
+        padding: 10px 12px;
         border-bottom: 1px solid #f1f5f9;
         vertical-align: middle;
+        font-size: 13.5px;
     }
 
     .items-table tr:hover td {
@@ -616,11 +625,11 @@
 
     .items-table input {
         width: 100%;
-        min-height: 32px;
-        padding: 5px 8px;
+        min-height: 36px;
+        padding: 6px 10px;
         border: 1px solid #e2e8f0;
         border-radius: 6px;
-        font-size: 12px;
+        font-size: 13px;
         color: #0f172a;
         background: #ffffff;
         outline: none;
@@ -1328,6 +1337,43 @@
     </div>
 </div>
 
+{{-- MODAL 3: IN-SYSTEM COMPRESSION CONFIRMATION MODAL --}}
+<div class="smart-modal-backdrop" id="compress-modal" style="display: none; z-index: 9999;">
+    <div class="smart-modal" style="max-width: 520px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);">
+        <div class="smart-modal-header" style="border-bottom: 1px solid #fee2e2; background: #fff5f5; border-top-left-radius: 12px; border-top-right-radius: 12px; padding: 16px 20px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #fecaca; color: #dc2626; border-radius: 50%; font-weight: bold; font-size: 16px;">!</span>
+                <h3 style="margin: 0; color: #991b1b; font-size: 16px; font-weight: 700;">File Exceeds Size Limit</h3>
+            </div>
+            <button type="button" class="btn-remove-file" id="btn-close-compress-modal" style="font-size: 18px;">&times;</button>
+        </div>
+        <div class="smart-modal-body" style="padding: 20px;">
+            <p style="font-size: 14px; color: #374151; margin-top: 0; margin-bottom: 12px; line-height: 1.5;">
+                The file you selected exceeds the maximum upload limit of <strong>50 MB</strong>:
+            </p>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+                <div id="compress-modal-filename" style="font-weight: 600; color: #0f172a; font-size: 13.5px; word-break: break-all;"></div>
+                <div id="compress-modal-filesize" style="font-size: 12px; color: #dc2626; font-weight: 600; margin-top: 4px;"></div>
+            </div>
+            <div id="compress-modal-offer" style="font-size: 13px; color: #475569; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; line-height: 1.45;">
+                <strong style="color: #1d4ed8; display: block; margin-bottom: 4px;">Direct In-System Compression Available</strong>
+                Would you like the system to automatically compress this file to fit within the limit and proceed with the upload?
+            </div>
+            <div id="compress-modal-cannot-compress" style="display: none; font-size: 13px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; line-height: 1.45;">
+                This document is a non-image file (e.g. PDF or DOCX) that exceeds 50 MB. Direct browser compression is only supported for image files. Please compress this file in an external PDF tool before uploading.
+            </div>
+            <div id="compress-modal-loading" style="display: none; text-align: center; padding: 16px 0;">
+                <div style="display: inline-block; width: 24px; height: 24px; border: 3px solid #bfdbfe; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                <p style="margin: 8px 0 0; font-size: 13px; color: #2563eb; font-weight: 600;">Compressing file in-system, please wait...</p>
+            </div>
+        </div>
+        <div class="smart-modal-footer" style="padding: 14px 20px; border-top: 1px solid #f1f5f9; background: #f8fafc; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn-action" id="btn-cancel-compress" style="padding: 8px 16px; font-size: 13px; font-weight: 600; border: 1px solid #cbd5e1; background: #ffffff; border-radius: 6px; cursor: pointer;">Cancel</button>
+            <button type="button" class="btn-toolbar btn-toolbar-primary" id="btn-confirm-compress" style="padding: 8px 18px; font-size: 13px; font-weight: 600; border-radius: 6px; background: #2563eb; color: #ffffff; border: none; cursor: pointer;">Compress &amp; Upload</button>
+        </div>
+    </div>
+</div>
+
 {{-- JAVASCRIPT LOGIC --}}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -1419,17 +1465,178 @@ document.addEventListener('DOMContentLoaded', function () {
         fileInput.files = transfer.files;
     }
 
-    function addFiles(files) {
+    async function compressImageFile(file, maxBytes) {
+        return new Promise(function (resolve) {
+            if (!file.type.startsWith('image/')) {
+                resolve(file);
+                return;
+            }
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function (event) {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 2400;
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    let quality = 0.85;
+                    function attemptCompress() {
+                        canvas.toBlob(function (blob) {
+                            if (!blob) {
+                                resolve(file);
+                                return;
+                            }
+                            if (blob.size <= maxBytes || quality <= 0.3) {
+                                const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+                                    type: 'image/jpeg',
+                                    lastModified: Date.now()
+                                });
+                                resolve(compressedFile);
+                            } else {
+                                quality -= 0.15;
+                                attemptCompress();
+                            }
+                        }, 'image/jpeg', quality);
+                    }
+                    attemptCompress();
+                };
+                img.onerror = function () {
+                    resolve(file);
+                };
+            };
+            reader.onerror = function () {
+                resolve(file);
+            };
+        });
+    }
+
+    // Compression Modal Elements
+    const compressModal = document.getElementById('compress-modal');
+    const compressModalFilename = document.getElementById('compress-modal-filename');
+    const compressModalFilesize = document.getElementById('compress-modal-filesize');
+    const compressModalOffer = document.getElementById('compress-modal-offer');
+    const compressModalCannotCompress = document.getElementById('compress-modal-cannot-compress');
+    const compressModalLoading = document.getElementById('compress-modal-loading');
+    const btnCloseCompressModal = document.getElementById('btn-close-compress-modal');
+    const btnCancelCompress = document.getElementById('btn-cancel-compress');
+    const btnConfirmCompress = document.getElementById('btn-confirm-compress');
+
+    function promptOversizeCompression(file) {
+        return new Promise(function (resolve) {
+            if (!compressModal) {
+                resolve({ shouldCompress: false });
+                return;
+            }
+
+            const isImage = file.type.startsWith('image/');
+            const fileMb = (file.size / (1024 * 1024)).toFixed(1);
+            const limitMb = Math.round(maxUploadBytes / (1024 * 1024));
+
+            compressModalFilename.textContent = file.name;
+            compressModalFilesize.textContent = `Current size: ${fileMb} MB (Limit: ${limitMb} MB)`;
+
+            if (isImage) {
+                compressModalOffer.style.display = 'block';
+                compressModalCannotCompress.style.display = 'none';
+                btnConfirmCompress.style.display = 'inline-flex';
+                btnConfirmCompress.textContent = 'Compress & Upload';
+            } else {
+                compressModalOffer.style.display = 'none';
+                compressModalCannotCompress.style.display = 'block';
+                btnConfirmCompress.style.display = 'none';
+            }
+
+            compressModalLoading.style.display = 'none';
+            compressModal.style.display = 'flex';
+
+            function cleanup() {
+                compressModal.style.display = 'none';
+                compressModalLoading.style.display = 'none';
+                btnConfirmCompress.removeEventListener('click', onConfirm);
+                btnCancelCompress.removeEventListener('click', onCancel);
+                btnCloseCompressModal.removeEventListener('click', onCancel);
+            }
+
+            function onConfirm() {
+                compressModalOffer.style.display = 'none';
+                compressModalLoading.style.display = 'block';
+                btnConfirmCompress.disabled = true;
+                btnCancelCompress.disabled = true;
+                setTimeout(function () {
+                    btnConfirmCompress.disabled = false;
+                    btnCancelCompress.disabled = false;
+                    cleanup();
+                    resolve({ shouldCompress: true });
+                }, 300);
+            }
+
+            function onCancel() {
+                cleanup();
+                resolve({ shouldCompress: false });
+            }
+
+            btnConfirmCompress.addEventListener('click', onConfirm);
+            btnCancelCompress.addEventListener('click', onCancel);
+            btnCloseCompressModal.addEventListener('click', onCancel);
+        });
+    }
+
+    async function addFiles(files) {
         if (!files || files.length === 0) return;
 
+        let rejectedOversize = [];
+        let rejectedMaxCount = false;
         let hasNew = false;
-        Array.from(files).forEach(function (file) {
+
+        for (let i = 0; i < files.length; i++) {
+            let file = files[i];
+
+            // If a file exceeds size limit, prompt user with error and in-system compression option
+            if (file.size > maxUploadBytes) {
+                const choice = await promptOversizeCompression(file);
+                if (choice.shouldCompress && file.type.startsWith('image/')) {
+                    const compressed = await compressImageFile(file, maxUploadBytes);
+                    if (compressed && compressed.size <= maxUploadBytes) {
+                        file = compressed;
+                    }
+                }
+            }
+
+            // Check file size limit
+            if (file.size > maxUploadBytes) {
+                const maxMb = Math.round(maxUploadBytes / (1024 * 1024));
+                rejectedOversize.push(`${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB exceeds ${maxMb} MB limit)`);
+                continue;
+            }
+
+            // Check max files limit
+            if (selectedFiles.length >= maxOcrFiles) {
+                rejectedMaxCount = true;
+                break;
+            }
+
             // Check duplicate in current batch
             const isDuplicate = selectedFiles.some(function (existing) {
                 return existing.file.name === file.name && existing.file.size === file.size;
             });
 
-            if (!isDuplicate && selectedFiles.length < maxOcrFiles) {
+            if (!isDuplicate) {
                 selectedFiles.push({
                     file: file,
                     category: detectCategoryFromName(file.name),
@@ -1440,7 +1647,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 hasNew = true;
             }
-        });
+        }
+
+        if (rejectedOversize.length > 0) {
+            alert(`The following file(s) exceeded the maximum upload limit of 50 MB and were not uploaded:\n• ` + rejectedOversize.join('\n• '));
+        }
+        if (rejectedMaxCount) {
+            alert(`Maximum upload limit reached: A maximum of ${maxOcrFiles} files can be added to this batch.`);
+        }
 
         if (hasNew) {
             syncInputFiles();
@@ -1860,7 +2074,7 @@ document.addEventListener('DOMContentLoaded', function () {
         } else if (!subjectInput.value && selectedFiles.length > 0) {
             const cleanName = selectedFiles[0].file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
             subjectInput.value = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-            setConfidenceBadge(badgeSubject, 'autofilled', 'From filename');
+            setConfidenceBadge(badgeSubject, 'filename', 'From filename');
         }
 
         // Reference
@@ -1977,7 +2191,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <td class="col-pos">${rowIndex + 1}</td>
             <td class="col-file">
                 <span class="file-attachment-pill" title="${data.fileName || 'Custom Item'}">
-                    📎 ${data.fileName ? data.fileName.slice(0, 15) + (data.fileName.length > 15 ? '...' : '') : 'Manual item'}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> ${data.fileName ? data.fileName.slice(0, 15) + (data.fileName.length > 15 ? '...' : '') : 'Manual item'}
                 </span>
                 <input type="hidden" name="items[${rowIndex}][document_index]" value="${data.docIndex !== undefined ? data.docIndex : ''}">
             </td>

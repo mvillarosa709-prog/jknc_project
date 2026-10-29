@@ -8,13 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('proof_of_transmissions', function (Blueprint $table) {
-            $table->foreignId('document_id')
-                ->nullable()
-                ->after('recipient_id')
-                ->constrained('transmittal_documents')
-                ->nullOnDelete();
-        });
+        if (Schema::hasTable('proof_of_transmissions')) {
+            Schema::table('proof_of_transmissions', function (Blueprint $table) {
+                if (!Schema::hasColumn('proof_of_transmissions', 'document_id')) {
+                    $table->foreignId('document_id')
+                        ->nullable()
+                        ->after('recipient_id')
+                        ->constrained('transmittal_documents')
+                        ->nullOnDelete();
+                }
+            });
+        }
     }
 
     public function down(): void

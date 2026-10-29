@@ -8,24 +8,38 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('transmittals', function (Blueprint $table) {
-            $table->softDeletes();
-            $table->foreignId('cancelled_by')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('cancelled_from_status')->nullable();
-            $table->timestamp('cancelled_at')->nullable();
-            $table->text('cancellation_reason')->nullable();
-        });
+        if (Schema::hasTable('transmittals')) {
+            Schema::table('transmittals', function (Blueprint $table) {
+                if (!Schema::hasColumn('transmittals', 'deleted_at')) {
+                    $table->softDeletes();
+                }
+                if (!Schema::hasColumn('transmittals', 'cancelled_by')) {
+                    $table->foreignId('cancelled_by')->nullable()->constrained('users')->nullOnDelete();
+                }
+                if (!Schema::hasColumn('transmittals', 'cancelled_from_status')) {
+                    $table->string('cancelled_from_status')->nullable();
+                }
+                if (!Schema::hasColumn('transmittals', 'cancelled_at')) {
+                    $table->timestamp('cancelled_at')->nullable();
+                }
+                if (!Schema::hasColumn('transmittals', 'cancellation_reason')) {
+                    $table->text('cancellation_reason')->nullable();
+                }
+            });
+        }
 
-        Schema::create('transmittal_lifecycle_archives', function (Blueprint $table) {
-            $table->id();
-            $table->unsignedBigInteger('transmittal_id')->nullable()->index();
-            $table->string('tracking_number')->index();
-            $table->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('action');
-            $table->text('reason');
-            $table->json('archived_record');
-            $table->timestamp('created_at')->useCurrent();
-        });
+        if (!Schema::hasTable('transmittal_lifecycle_archives')) {
+            Schema::create('transmittal_lifecycle_archives', function (Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('transmittal_id')->nullable()->index();
+                $table->string('tracking_number')->index();
+                $table->foreignId('actor_id')->nullable()->constrained('users')->nullOnDelete();
+                $table->string('action');
+                $table->text('reason');
+                $table->json('archived_record');
+                $table->timestamp('created_at')->useCurrent();
+            });
+        }
     }
 
     public function down(): void

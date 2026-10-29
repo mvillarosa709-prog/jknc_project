@@ -31,12 +31,46 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Throwable;
+use App\Models\Project;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 
 class TransmittalController extends Controller
 {
     public function index(Request $request): View
     {
+        if ($request->routeIs('transmittal.index') || $request->is('transmittal')) {
+            $prefill = $request->query('prefill');
+
+            if (is_string($prefill)) {
+                $decodedPrefill = json_decode($prefill, true);
+                $prefill = is_array($decodedPrefill) ? $decodedPrefill : null;
+            }
+
+            $totalCount = Transmittal::count();
+            $awaitingApprovalCount = Transmittal::whereIn('status', ['pending_approval', 'submitted'])->count();
+            $awaitingAcknowledgmentCount = Transmittal::whereIn('status', ['sent', 'approved'])->count();
+            $completedThisMonthCount = Transmittal::whereIn('status', ['acknowledged', 'completed'])
+                ->whereMonth('created_at', now()->month)
+                ->whereYear('created_at', now()->year)
+                ->count();
+
+            return view('transmittal.index', [
+                'prefill' => is_array($prefill) ? $prefill : null,
+                'contactOptions' => $this->transmittalContactOptions(),
+                'employeeOptions' => $this->transmittalEmployeeOptions(),
+                'companyOptions' => $this->transmittalCompanyOptions(),
+                'corporateContext' => $this->transmittalCorporateContext(),
+                'metrics' => [
+                    'total' => $totalCount,
+                    'awaiting_approval' => $awaitingApprovalCount,
+                    'awaiting_acknowledgment' => $awaitingAcknowledgmentCount,
+                    'completed_this_month' => $completedThisMonthCount,
+                ],
+            ]);
+        }
+
         $query = Transmittal::query()
             ->with(['preparer', 'recipients'])
             ->withCount(['recipients', 'documents', 'proofs', 'receipts'])
@@ -328,8 +362,9 @@ class TransmittalController extends Controller
 
 public function workspace(Request $request, Transmittal $transmittal): View
     {
-        // Payagan ang pag-access sa workspace kahit guest basta umiiral ang transmittal
-        // (O maaari mong ilagay ang iyong custom check kung kinakailangan)
+        if ($transmittal->status === 'draft') {
+            abort_unless($this->canEditDraft($request, $transmittal), 404);
+        }
         
         $transmittal->load([
             'recipients',
@@ -348,7 +383,10 @@ public function workspace(Request $request, Transmittal $transmittal): View
             'canViewPrivateFiles' => $this->canViewPrivateFiles($request, $transmittal),
             'canViewAttachments' => $this->canViewPrivateAttachments($request, $transmittal),
             'canManageLifecycle' => $this->canManageLifecycle($request, $transmittal),
-            'canUploadProof' => true, // Ginawa nating true para makapag-upload kaagad ang kahit sino sa workspace
+            'canUploadProof' => true,
+            'contactOptions' => $this->transmittalContactOptions(),
+            'employeeOptions' => $this->transmittalEmployeeOptions(),
+            'companyOptions' => $this->transmittalCompanyOptions(),
         ] + $this->signatoryDirectory());
     }
 
@@ -479,68 +517,101 @@ public function workspace(Request $request, Transmittal $transmittal): View
         }
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
     {
         $validated = $this->validateTransmittal($request);
         $isDraft = $validated['intent'] === 'draft';
         $user = $request->user();
         $editToken = Str::random(64);
 
-        $transmittal = DB::transaction(function () use ($validated, $request, $user, $editToken, $isDraft): Transmittal {
-            $transmittal = Transmittal::query()->create([
-                'tracking_number' => 'PENDING-'.Str::uuid(),
-                'external_reference' => $validated['external_reference'] ?? null,
-                'subject' => $validated['subject'],
-                'purpose' => $validated['purpose'],
-                'direction' => $validated['direction'],
-                'transmittal_date' => $validated['transmittal_date'],
-                'origin_office' => $validated['origin_office'],
-                'recipient_address' => $validated['recipient_address'] ?? null,
-                'related_company' => $validated['related_company'] ?? null,
-                'delivery_method' => $validated['delivery_method'] ?? 'electronic',
-                'delivery_type' => $validated['delivery_type'] ?? 'by_person',
-                'delivery_actions' => $validated['delivery_actions'] ?? [],
-                'prepared_by_name' => $user?->name ?? 'Public submitter',
-                'prepared_at' => now(),
-                'approved_by_name' => $this->resolveSignatoryName($validated, 'approved_by_name', 'approved_by_employee'),
-                'operations_manager' => $this->resolveSignatoryName($validated, 'operations_manager', 'operations_manager_employee'),
-                'delivered_by' => $this->resolveSelectedName($validated, 'delivered_by', 'delivered_by_employee'),
-                'received_by' => $this->resolveSelectedName($validated, 'received_by', 'received_by_contact'),
-                'processing_company' => $this->resolveSelectedName($validated, 'processing_company', 'processing_company_selection'),
-                'confidentiality' => $validated['confidentiality'],
-                'status' => $isDraft ? 'draft' : 'pending_approval',
-                'prepared_by' => $user?->id,
-            ]);
-            $transmittal->forceFill([
-                'tracking_number' => 'TRN-'.str_pad((string) $transmittal->id, 5, '0', STR_PAD_LEFT),
-                'edit_token_hash' => hash('sha256', $editToken),
-            ])->save();
+        try {
+            $transmittal = DB::transaction(function () use ($validated, $request, $user, $editToken, $isDraft): Transmittal {
+                $transmittal = Transmittal::query()->create([
+                    'tracking_number' => 'PENDING-'.Str::uuid(),
+                    'external_reference' => $validated['external_reference'] ?? null,
+                    'subject' => $validated['subject'],
+                    'purpose' => $validated['purpose'],
+                    'direction' => $validated['direction'],
+                    'mode' => strtoupper($validated['direction']),
+                    'transmittal_date' => $validated['transmittal_date'],
+                    'origin_office' => $validated['origin_office'],
+                    'recipient_address' => $validated['recipient_address'] ?? null,
+                    'related_company' => $validated['related_company'] ?? null,
+                    'delivery_method' => $validated['delivery_method'] ?? 'electronic',
+                    'delivery_type' => $validated['delivery_type'] ?? 'by_person',
+                    'by_person_who' => $validated['by_person_who'] ?? null,
+                    'registered_mail_provider' => filled($validated['registered_mail_provider_other'] ?? null) && ($validated['registered_mail_provider'] ?? '') === 'Others'
+                        ? $validated['registered_mail_provider_other']
+                        : ($validated['registered_mail_provider'] ?? null),
+                    'electronic_method' => $validated['electronic_method'] ?? (($validated['delivery_type'] ?? '') === 'electronic' ? 'Email' : null),
+                    'delivery_actions' => $validated['delivery_actions'] ?? [],
+                    'prepared_by_name' => $user?->name ?? 'Public submitter',
+                    'prepared_at' => now(),
+                    'approved_by_name' => $this->resolveSignatoryName($validated, 'approved_by_name', 'approved_by_employee'),
+                    'operations_manager' => $this->resolveSignatoryName($validated, 'operations_manager', 'operations_manager_employee'),
+                    'delivered_by' => $this->resolveSelectedName($validated, 'delivered_by', 'delivered_by_employee'),
+                    'received_by' => $this->resolveSelectedName($validated, 'received_by', 'received_by_contact'),
+                    'processing_company' => $this->resolveSelectedName($validated, 'processing_company', 'processing_company_selection'),
+                    'confidentiality' => $validated['confidentiality'],
+                    'status' => $isDraft ? 'draft' : 'pending_approval',
+                    'prepared_by' => $user?->id,
+                ]);
+                $transmittal->forceFill([
+                    'tracking_number' => 'TRN-'.str_pad((string) $transmittal->id, 5, '0', STR_PAD_LEFT),
+                    'edit_token_hash' => hash('sha256', $editToken),
+                ])->save();
 
-            $this->syncRecipients($transmittal, $validated['recipients'] ?? []);
-            $uploadedDocuments = $this->storeDocuments($transmittal, $request, $user, $validated);
-            $this->syncItems($transmittal, $request, $user, $validated, $uploadedDocuments);
+                $this->syncRecipients($transmittal, $validated['recipients'] ?? []);
+                $uploadedDocuments = $this->storeDocuments($transmittal, $request, $user, $validated);
+                $this->syncItems($transmittal, $request, $user, $validated, $uploadedDocuments);
 
-            $transmittal->histories()->create([
-                'actor_id' => $user?->id,
-                'action' => $isDraft ? 'draft_saved' : 'submitted',
-                'description' => $isDraft
-                    ? 'Public draft saved and linked to the submitter browser session.'
-                    : 'Public submission received and added to the administrator review queue.',
-                'created_at' => now(),
-            ]);
+                $transmittal->histories()->create([
+                    'actor_id' => $user?->id,
+                    'action' => $isDraft ? 'draft_saved' : 'submitted',
+                    'description' => $isDraft
+                        ? 'Public draft saved and linked to the submitter browser session.'
+                        : 'Public submission received and added to the administrator review queue.',
+                    'created_at' => now(),
+                ]);
 
-            return $transmittal;
-        });
+                return $transmittal;
+            });
+        } catch (\Throwable $e) {
+            \Log::error('Transmittal save failed: ' . $e->getMessage(), ['exception' => $e]);
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => 'Kindly fill up the required form fields properly before proceeding.',
+                    'errors' => ['form' => ['Kindly fill up the required form fields properly before proceeding.']],
+                ], 422);
+            }
+            return back()->withInput()->withErrors(['form' => 'Kindly fill up the required form fields properly before proceeding.']);
+        }
 
         $tokens = $request->session()->get('transmittal_draft_tokens', []);
         $tokens[$transmittal->id] = $editToken;
         $request->session()->put('transmittal_draft_tokens', $tokens);
 
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => $isDraft
+                    ? "Draft {$transmittal->tracking_number} saved successfully."
+                    : 'Transmittal submitted for review successfully.',
+                'tracking_number' => $transmittal->tracking_number,
+                'id' => $transmittal->id,
+                'is_draft' => $isDraft,
+                'redirect_url' => route('transmittal.index', ['filter' => $isDraft ? 'uploaded' : 'submitted']),
+            ]);
+        }
+
+        if (! $isDraft) {
+            return redirect()->route('transmittal.index', ['filter' => 'submitted'])
+                ->with('status', 'Transmittal submitted for administrator review.');
+        }
+
         return redirect()->route('transmittals.index', [
-            'filter' => $isDraft ? 'uploaded' : 'submitted',
-        ])->with('status', $isDraft
-            ? "Draft {$transmittal->tracking_number} saved. You can continue editing it from this browser."
-            : 'Transmittal submitted for administrator review.');
+            'filter' => 'uploaded',
+        ])->with('status', "Draft {$transmittal->tracking_number} saved. You can continue editing it from this browser.");
     }
 
     public function update(Request $request, Transmittal $transmittal): RedirectResponse
@@ -550,80 +621,104 @@ public function workspace(Request $request, Transmittal $transmittal): View
         $isDraft = $validated['intent'] === 'draft';
         $user = $request->user();
 
-        $isReverting = DB::transaction(function () use ($transmittal, $validated, $request, $user, $isDraft): bool {
-            $record = Transmittal::query()->whereKey($transmittal->id)->lockForUpdate()->firstOrFail();
-            abort_unless($this->canEditDraft($request, $record), 404);
-            $isReverting = $record->status === 'rejected' && ! $isDraft;
+        try {
+            $isReverting = DB::transaction(function () use ($transmittal, $validated, $request, $user, $isDraft): bool {
+                $record = Transmittal::query()->whereKey($transmittal->id)->lockForUpdate()->firstOrFail();
+                abort_unless($this->canEditDraft($request, $record), 404);
+                $isReverting = $record->status === 'rejected' && ! $isDraft;
 
-            $record->forceFill([
-                'external_reference' => filled($validated['external_reference'] ?? null)
-                    ? $validated['external_reference']
-                    : $record->external_reference,
-                'subject' => $validated['subject'],
-                'purpose' => $validated['purpose'],
-                'direction' => $validated['direction'],
-                'transmittal_date' => $validated['transmittal_date'],
-                'origin_office' => $validated['origin_office'],
-                'recipient_address' => filled($validated['recipient_address'] ?? null)
-                    ? $validated['recipient_address']
-                    : $record->recipient_address,
-                'related_company' => filled($validated['related_company'] ?? null)
-                    ? $validated['related_company']
-                    : $record->related_company,
-                'delivery_method' => $validated['delivery_method'] ?? 'electronic',
-                'delivery_type' => $validated['delivery_type'] ?? $record->delivery_type ?? 'by_person',
-                'delivery_actions' => $validated['delivery_actions'] ?? $record->delivery_actions ?? [],
-                'prepared_by_name' => $user?->name ?? $record->prepared_by_name ?? 'Public submitter',
-                'prepared_at' => $record->prepared_at ?? now(),
-                'approved_by_name' => $this->resolveSignatoryName($validated, 'approved_by_name', 'approved_by_employee')
-                    ?? $record->approved_by_name,
-                'operations_manager' => $this->resolveSignatoryName($validated, 'operations_manager', 'operations_manager_employee')
-                    ?? $record->operations_manager,
-                'delivered_by' => $this->resolveSelectedName($validated, 'delivered_by', 'delivered_by_employee')
-                    ?? $record->delivered_by,
-                'received_by' => $this->resolveSelectedName($validated, 'received_by', 'received_by_contact')
-                    ?? $record->received_by,
-                'processing_company' => $this->resolveSelectedName($validated, 'processing_company', 'processing_company_selection')
-                    ?? $record->processing_company,
-                'confidentiality' => $validated['confidentiality'],
-                'status' => $isDraft ? ($record->status === 'rejected' ? 'rejected' : 'draft') : 'pending_approval',
-                'edit_token_hash' => $record->edit_token_hash,
-            ])->save();
+                $record->forceFill([
+                    'external_reference' => filled($validated['external_reference'] ?? null)
+                        ? $validated['external_reference']
+                        : $record->external_reference,
+                    'subject' => $validated['subject'],
+                    'purpose' => $validated['purpose'],
+                    'direction' => $validated['direction'],
+                    'mode' => strtoupper($validated['direction']),
+                    'transmittal_date' => $validated['transmittal_date'],
+                    'origin_office' => $validated['origin_office'],
+                    'recipient_address' => filled($validated['recipient_address'] ?? null)
+                        ? $validated['recipient_address']
+                        : $record->recipient_address,
+                    'related_company' => filled($validated['related_company'] ?? null)
+                        ? $validated['related_company']
+                        : $record->related_company,
+                    'delivery_method' => $validated['delivery_method'] ?? 'electronic',
+                    'delivery_type' => $validated['delivery_type'] ?? $record->delivery_type ?? 'by_person',
+                    'by_person_who' => array_key_exists('by_person_who', $validated) ? $validated['by_person_who'] : $record->by_person_who,
+                    'registered_mail_provider' => filled($validated['registered_mail_provider_other'] ?? null) && ($validated['registered_mail_provider'] ?? '') === 'Others'
+                        ? $validated['registered_mail_provider_other']
+                        : ($validated['registered_mail_provider'] ?? $record->registered_mail_provider),
+                    'electronic_method' => $validated['electronic_method'] ?? (($validated['delivery_type'] ?? '') === 'electronic' ? 'Email' : $record->electronic_method),
+                    'delivery_actions' => $validated['delivery_actions'] ?? $record->delivery_actions ?? [],
+                    'prepared_by_name' => $user?->name ?? $record->prepared_by_name ?? 'Public submitter',
+                    'prepared_at' => $record->prepared_at ?? now(),
+                    'approved_by_name' => $this->resolveSignatoryName($validated, 'approved_by_name', 'approved_by_employee')
+                        ?? $record->approved_by_name,
+                    'operations_manager' => $this->resolveSignatoryName($validated, 'operations_manager', 'operations_manager_employee')
+                        ?? $record->operations_manager,
+                    'delivered_by' => $this->resolveSelectedName($validated, 'delivered_by', 'delivered_by_employee')
+                        ?? $record->delivered_by,
+                    'received_by' => $this->resolveSelectedName($validated, 'received_by', 'received_by_contact')
+                        ?? $record->received_by,
+                    'processing_company' => $this->resolveSelectedName($validated, 'processing_company', 'processing_company_selection')
+                        ?? $record->processing_company,
+                    'confidentiality' => $validated['confidentiality'],
+                    'status' => $isDraft ? ($record->status === 'rejected' ? 'rejected' : 'draft') : 'pending_approval',
+                    'workflow_status' => $isDraft ? ($isReverting ? 'Reverted' : ($record->workflow_status ?? 'Uploaded')) : 'Submitted',
+                    'approval_status' => $isDraft ? ($record->approval_status ?? 'Draft') : 'Pending',
+                    'submitted_by' => $isDraft ? $record->submitted_by : ($user?->id ?? $record->submitted_by),
+                    'edit_token_hash' => $record->edit_token_hash,
+                ])->save();
 
-            $recipients = $validated['recipients'] ?? [];
-            $hasRecipientEmail = collect($recipients)->contains(
-                fn ($recipient): bool => is_array($recipient) && filled($recipient['email'] ?? null)
-            );
-            if ($hasRecipientEmail || ! $isDraft || $record->recipients()->doesntExist()) {
-                $this->syncRecipients($record, $recipients);
-            }
-            $uploadedDocuments = $this->storeDocuments($record, $request, $user, $validated);
-            if (array_key_exists('items', $validated)) {
-                $this->syncItems($record, $request, $user, $validated, $uploadedDocuments);
-            }
-            $record->histories()->create([
-                'actor_id' => $user?->id,
-                'action' => $isReverting && ! $isDraft ? 'reverted_for_revision' : ($isDraft ? 'draft_updated' : 'submitted'),
-                'description' => $isReverting && ! $isDraft
-                    ? 'Reverted transmittal revised and resubmitted under the same tracking number.'
-                    : ($isDraft
-                        ? 'Public draft details updated.'
-                        : 'Saved draft submitted to the administrator review queue.'),
-                'created_at' => now(),
-            ]);
+                $recipients = $validated['recipients'] ?? [];
+                $hasRecipientInfo = collect($recipients)->contains(
+                    fn ($recipient): bool => is_array($recipient) && (filled($recipient['email'] ?? null) || filled($recipient['name'] ?? null) || filled($recipient['organization'] ?? null))
+                );
+                if ($hasRecipientInfo || ! $isDraft || $record->recipients()->doesntExist()) {
+                    $this->syncRecipients($record, $recipients);
+                }
+                $uploadedDocuments = $this->storeDocuments($record, $request, $user, $validated);
+                if (array_key_exists('items', $validated)) {
+                    $this->syncItems($record, $request, $user, $validated, $uploadedDocuments);
+                }
+                $record->histories()->create([
+                    'actor_id' => $user?->id,
+                    'action' => $isReverting && ! $isDraft ? 'reverted_for_revision' : ($isDraft ? 'draft_updated' : 'submitted'),
+                    'description' => $isReverting && ! $isDraft
+                        ? 'Reverted transmittal revised and resubmitted under the same tracking number.'
+                        : ($isDraft
+                            ? 'Public draft details updated.'
+                            : 'Saved draft submitted to the administrator review queue.'),
+                    'created_at' => now(),
+                ]);
 
-            return $isReverting;
-        });
+                return $isReverting;
+            });
+        } catch (\Throwable $e) {
+            \Log::error('Transmittal update failed: ' . $e->getMessage(), ['exception' => $e]);
+            return back()->withInput()->withErrors(['form' => 'Kindly fill up the required form fields properly before proceeding.']);
+        }
 
-        return redirect()->route('transmittals.index', [
-            'filter' => $isDraft ? ($isReverting ? 'reverted' : 'uploaded') : 'submitted',
-        ])->with('status', $isDraft
-            ? "Draft {$transmittal->tracking_number} updated."
-            : 'Transmittal submitted for administrator review.');
+        if (! $isDraft) {
+            return redirect()->route('transmittal.index', ['filter' => 'submitted'])
+                ->with('status', 'Transmittal submitted for administrator review.');
+        }
+
+        return redirect()->route('transmittal.index', [
+            'filter' => $isReverting ? 'reverted' : 'uploaded',
+        ])->with('status', "Draft {$transmittal->tracking_number} updated.");
     }
 
     private function validateTransmittal(Request $request): array
     {
+        if ($request->has('items') && is_string($request->input('items'))) {
+            $decoded = json_decode($request->input('items'), true);
+            if (is_array($decoded)) {
+                $request->merge(['items' => $decoded]);
+            }
+        }
+
         return $request->validate([
             'intent' => ['required', Rule::in(['draft', 'submit'])],
             'subject' => ['required', 'string', 'max:200'],
@@ -633,11 +728,14 @@ public function workspace(Request $request, Transmittal $transmittal): View
             'transmittal_date' => ['required', 'date'],
             'origin_office' => ['required', 'string', 'max:160'],
             'recipient_address' => ['nullable', 'string', 'max:2000'],
-            'related_company' => ['nullable', 'string', 'max:160'],
-            'delivery_method' => ['nullable', Rule::in(['electronic'])],
-            'delivery_type' => ['nullable', Rule::in(['by_person', 'registered_mail', 'electronic', 'physical', 'courier', 'other'])],
+            'delivery_method' => ['nullable', 'string', 'max:60'],
+            'delivery_type' => ['nullable', 'string', 'max:60'],
+            'by_person_who' => ['nullable', 'string', 'max:160'],
+            'registered_mail_provider' => ['nullable', 'string', 'max:160'],
+            'registered_mail_provider_other' => ['nullable', 'string', 'max:160'],
+            'electronic_method' => ['nullable', 'string', 'max:160'],
             'delivery_actions' => ['nullable', 'array', 'max:4'],
-            'delivery_actions.*' => ['required', Rule::in(['delivery', 'pick_up', 'drop_off', 'email'])],
+            'delivery_actions.*' => ['nullable', 'string', 'max:40'],
             'operations_manager' => ['nullable', 'string', 'max:160'],
             'operations_manager_employee' => ['nullable', 'integer', 'exists:users,id'],
             'approved_by_name' => ['nullable', 'string', 'max:160'],
@@ -651,7 +749,13 @@ public function workspace(Request $request, Transmittal $transmittal): View
             'confidentiality' => ['required', Rule::in(['standard', 'confidential', 'restricted'])],
             'recipients' => ['required_if:intent,submit', 'array', 'min:1', 'max:20'],
             'recipients.*.name' => ['nullable', 'string', 'max:120'],
-            'recipients.*.email' => ['required_if:intent,submit', 'nullable', 'email', 'max:255', 'distinct:ignore_case'],
+            'recipients.*.email' => [
+                Rule::requiredIf(fn () => $request->input('intent') === 'submit' && ($request->input('delivery_type') === 'electronic' || in_array('email', (array) $request->input('delivery_actions', []), true))),
+                'nullable',
+                'email',
+                'max:255',
+                'distinct:ignore_case'
+            ],
             'recipients.*.organization' => ['nullable', 'string', 'max:160'],
             'documents' => ['nullable', 'array', 'max:'.config('ordo.ocr.max_files', 50)],
             'documents.*' => ['file', 'max:'.(int) ceil(config('ordo.upload.max_bytes') / 1024), 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
@@ -671,6 +775,19 @@ public function workspace(Request $request, Transmittal $transmittal): View
             'items.*.description' => ['nullable', 'string', 'max:2000'],
             'items.*.remarks' => ['nullable', 'string', 'max:2000'],
             'items.*.attachment' => ['nullable', 'file', 'max:'.(int) ceil(config('ordo.upload.max_bytes') / 1024), 'mimes:pdf,jpg,jpeg,png,tif,tiff,doc,docx'],
+        ], [
+            'intent.required' => 'Kindly select an action (Save Draft or Submit for review).',
+            'subject.required' => 'Kindly fill up the required subject field.',
+            'purpose.required' => 'Kindly fill up the transmittal purpose.',
+            'direction.required' => 'Kindly select the transmittal mode (Send or Receive).',
+            'transmittal_date.required' => 'Kindly select the transmittal date.',
+            'origin_office.required' => 'Kindly specify the office name.',
+            'recipients.required_if' => 'Kindly specify at least one recipient before submitting for review.',
+            'recipients.*.email.required' => 'Kindly fill up the required recipient email address.',
+            'recipients.*.email.email' => 'Kindly provide a valid recipient email address.',
+            'recipients.*.name.max' => 'Recipient name cannot exceed 120 characters.',
+            'items.array' => 'Kindly fill up the item details properly.',
+            'items.max' => 'The items list cannot exceed 50 items.',
         ]);
     }
 
@@ -697,17 +814,22 @@ public function workspace(Request $request, Transmittal $transmittal): View
     private function signatoryDirectory(): array
     {
         $employees = User::query()->orderBy('id')->get(['id', 'name', 'transmittal_role']);
+
         $contacts = TransmittalRecipient::query()
             ->whereNotNull('name')
             ->where('name', '<>', '')
+            ->whereRaw('LENGTH(name) <= 60')
+            ->where('name', 'not like', '%confidential%')
+            ->where('name', 'not like', '%LOM%')
             ->orderBy('id')
             ->get(['id', 'name', 'organization'])
             ->unique(fn (TransmittalRecipient $recipient): string => mb_strtolower(trim($recipient->name)))
             ->values();
+
         $companies = Transmittal::query()->whereNotNull('related_company')->orderBy('id')->pluck('related_company')
             ->merge(TransmittalRecipient::query()->whereNotNull('organization')->orderBy('id')->pluck('organization'))
             ->map(fn ($company): string => trim((string) $company))
-            ->filter()
+            ->filter(fn (string $company): bool => strlen($company) <= 60 && ! str_contains(strtolower($company), 'confidential') && ! str_contains(strtolower($company), 'address:'))
             ->unique(fn (string $company): string => mb_strtolower($company))
             ->values();
 
@@ -719,8 +841,16 @@ public function workspace(Request $request, Transmittal $transmittal): View
         $transmittal->recipients()->delete();
 
         foreach ($recipients as $recipient) {
-            if (filled($recipient['email'] ?? null)) {
-                $transmittal->recipients()->create($recipient);
+            $name = filled($recipient['name'] ?? null) ? trim((string) $recipient['name']) : null;
+            $email = filled($recipient['email'] ?? null) ? trim((string) $recipient['email']) : null;
+            $org = filled($recipient['organization'] ?? null) ? trim((string) $recipient['organization']) : null;
+
+            if ($email !== null || $name !== null || $org !== null) {
+                $transmittal->recipients()->create([
+                    'name' => $name,
+                    'email' => $email,
+                    'organization' => $org,
+                ]);
             }
         }
     }
@@ -796,23 +926,32 @@ public function workspace(Request $request, Transmittal $transmittal): View
     }
 
     private function canEditDraft(Request $request, Transmittal $transmittal): bool
-{
-    if (! in_array($transmittal->status, ['draft', 'rejected'], true)) {
+    {
+        if (! in_array($transmittal->status, ['draft', 'rejected', 'pending_approval'], true)) {
+            return false;
+        }
+
+        $user = $request->user();
+
+        if ($user) {
+            return true;
+        }
+
+        $token = $request->session()->get("transmittal_draft_tokens.{$transmittal->id}");
+
+        if (is_string($token)
+            && is_string($transmittal->edit_token_hash)
+            && hash_equals($transmittal->edit_token_hash, hash('sha256', $token))) {
+            return true;
+        }
+
+        // Allow public editing for draft or rejected transmittals created in the system
+        if (in_array($transmittal->status, ['draft', 'rejected'], true)) {
+            return true;
+        }
+
         return false;
     }
-
-    $user = $request->user();
-
-    if ($user?->canApproveTransmittals() || $transmittal->prepared_by === $user?->id) {
-        return true;
-    }
-
-    $token = $request->session()->get("transmittal_draft_tokens.{$transmittal->id}");
-
-    return is_string($token)
-        && is_string($transmittal->edit_token_hash)
-        && hash_equals($transmittal->edit_token_hash, hash('sha256', $token));
-}
 
     public function show(Request $request, Transmittal $transmittal): View|RedirectResponse
     {
@@ -832,7 +971,7 @@ public function workspace(Request $request, Transmittal $transmittal): View
         ]);
         $canEditDraft = $this->canEditDraft($request, $transmittal);
 
-        if ($canEditDraft && $transmittal->status === 'rejected') {
+        if ($transmittal->status === 'draft' || $transmittal->status === 'rejected') {
             return redirect()->route('transmittals.workspace', $transmittal);
         }
 
@@ -1076,11 +1215,27 @@ public function transmit(
         )->block(10, function () use ($request, $transmittal, $brevo): int {
             $sent = 0;
 
+            if ($transmittal->recipients->isEmpty() && filled($transmittal->recipient_email)) {
+                $transmittal->recipients()->create([
+                    'name' => $transmittal->party_name ?: $transmittal->recipient_email,
+                    'email' => $transmittal->recipient_email,
+                    'organization' => $transmittal->office_name ?: $transmittal->related_company,
+                ]);
+                $transmittal->load('recipients');
+            }
+
             foreach ($transmittal->recipients as $recipient) {
                 $recipient->refresh();
 
-                if ($recipient->sent_at) {
+                // Determine valid recipient email
+                $targetEmail = trim((string) ($recipient->email ?: $transmittal->recipient_email));
+                if ($targetEmail === '' || ! filter_var($targetEmail, FILTER_VALIDATE_EMAIL)) {
                     continue;
+                }
+
+                // If recipient model was missing email, populate it
+                if (empty($recipient->email)) {
+                    $recipient->forceFill(['email' => $targetEmail])->save();
                 }
 
                 $token = \Illuminate\Support\Str::random(64);
@@ -1102,8 +1257,8 @@ public function transmit(
                     ): void {
                         $recipient->forceFill([
                             'acknowledgment_token_hash' => hash('sha256', $token),
-                            'acknowledgment_expires_at' => $sentAt->copy()->addDays(
-                                config('ordo.brevo.acknowledgment_days')
+                            'acknowledgment_expires_at' => $sentAt->copy()->addHours(
+                                (int) config('ordo.brevo.acknowledgment_hours', 72)
                             ),
                             'sent_at' => $sentAt,
                         ])->save();
@@ -1191,7 +1346,9 @@ public function transmit(
             ],
             'proof' => ['required', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,tif,tiff,mp4,mov,webm'],
             'channel' => ['required', Rule::in(['email', 'courier', 'in_person', 'registered_mail', 'portal', 'manual', 'other'])],
+            'channel_other' => ['nullable', 'string', 'max:160'],
             'proof_type' => ['required', Rule::in(['delivery_receipt', 'email_confirmation', 'courier_receipt', 'other'])],
+            'proof_type_other' => ['nullable', 'string', 'max:160'],
             'sender_name' => ['required', 'string', 'max:160'],
             'sender_position' => ['nullable', 'string', 'max:160'],
             'receiver_name' => ['required', 'string', 'max:160'],
@@ -1200,6 +1357,7 @@ public function transmit(
             'location' => ['nullable', 'string', 'max:200'],
             'device' => ['nullable', 'string', 'max:300'],
             'device_category' => ['required', Rule::in(['desktop', 'laptop', 'mobile', 'tablet', 'other'])],
+            'device_category_other' => ['nullable', 'string', 'max:160'],
             'reference_number' => ['nullable', 'string', 'max:120'],
             'proof_date' => ['nullable', 'date'],
             'transmission_at' => ['required', 'date'],
@@ -1239,12 +1397,15 @@ public function transmit(
                     'provider_metadata' => [
                         'source' => $ocrData === null ? 'manual_upload' : 'ocr_assisted_upload',
                         'proof_type' => $validated['proof_type'],
+                        'proof_type_other' => $validated['proof_type_other'] ?? null,
+                        'channel_other' => $validated['channel_other'] ?? null,
                         'sender_name' => $validated['sender_name'],
                         'sender_position' => $validated['sender_position'] ?? null,
                         'sender_location' => $validated['location'] ?? null,
                         'location' => $validated['location'] ?? null,
                         'location_source' => filled($validated['location'] ?? null) ? 'user_entered' : null,
                         'device_category' => $validated['device_category'] ?? null,
+                        'device_category_other' => $validated['device_category_other'] ?? null,
                         'device' => $validated['device'] ?? null,
                         'device_source' => filled($validated['device'] ?? null) || filled($validated['device_category'] ?? null) ? 'user_entered' : null,
                         'transmission_at_source' => 'user_entered',
@@ -1327,7 +1488,9 @@ public function transmit(
             'recipient_id' => ['nullable', Rule::exists('transmittal_recipients', 'id')->where('transmittal_id', $transmittal->id)],
             'proof' => ['nullable', 'file', 'max:51200', 'mimes:pdf,jpg,jpeg,png,tif,tiff,mp4,mov,webm'],
             'channel' => ['required', Rule::in(['email', 'courier', 'in_person', 'registered_mail', 'portal', 'manual', 'other'])],
+            'channel_other' => ['nullable', 'string', 'max:160'],
             'proof_type' => ['required', Rule::in(['delivery_receipt', 'email_confirmation', 'courier_receipt', 'other'])],
+            'proof_type_other' => ['nullable', 'string', 'max:160'],
             'sender_name' => ['required', 'string', 'max:160'],
             'sender_position' => ['nullable', 'string', 'max:160'],
             'receiver_name' => ['required', 'string', 'max:160'],
@@ -1336,6 +1499,7 @@ public function transmit(
             'location' => ['nullable', 'string', 'max:200'],
             'device' => ['nullable', 'string', 'max:300'],
             'device_category' => ['required', Rule::in(['desktop', 'laptop', 'mobile', 'tablet', 'other'])],
+            'device_category_other' => ['nullable', 'string', 'max:160'],
             'reference_number' => ['nullable', 'string', 'max:120'],
             'transmission_at' => ['nullable', 'date'],
             'acknowledged_at' => ['nullable', 'date'],
@@ -1471,7 +1635,11 @@ public function transmit(
 
     public function pdf(Request $request, Transmittal $transmittal): Response
     {
-        abort_unless($this->canViewPrivateFiles($request, $transmittal), 404);
+        $canAccess = $this->canViewPrivateFiles($request, $transmittal)
+            || ($request->user() && $transmittal->exists)
+            || $this->canManageLifecycle($request, $transmittal);
+
+        abort_unless($canAccess, 404);
         $transmittal->load(['preparer', 'approver', 'rejector', 'recipients', 'documents', 'items.document', 'proofs.recipient', 'receipts', 'histories']);
 
         $pdf = Pdf::loadView('transmittals.pdf', compact('transmittal'))
@@ -1480,8 +1648,18 @@ public function transmit(
         return $this->markPrivateFileResponse($pdf->download($transmittal->tracking_number.'.pdf'));
     }
 
-    public function receiptPdf(Request $request, Transmittal $transmittal, int $receipt): Response
+    public function receiptPdf(Request $request, Transmittal $transmittal, ?int $receipt = null): Response
     {
+        if ($receipt === null) {
+            $transmittal->load(['receipt']);
+
+            if (! $transmittal->receipt) {
+                abort(404, 'Receipt not found.');
+            }
+
+            return $this->renderReceiptPdf($transmittal, $transmittal->receipt);
+        }
+
         abort_unless($this->canViewPrivateFiles($request, $transmittal), 404);
 
         $transmittal->load(['recipients', 'receipts.recipient']);
@@ -1522,23 +1700,195 @@ public function transmit(
 
     private function renderReceiptPdf(Transmittal $transmittal, TransmittalReceipt $receipt): Response
     {
+        $transmittal->loadMissing(['items', 'documents', 'attachments', 'recipients', 'receipts']);
         $receipt->loadMissing('recipient');
-        $receipt->recipient?->load([
-            'proofs' => fn ($query) => $query
-                ->where('status', 'acknowledged')
-                ->latest('acknowledged_at')
-                ->limit(1),
-        ]);
-        $acknowledgmentProof = $receipt->recipient?->proofs->first();
 
-        $response = Pdf::loadView('transmittals.receipt', [
+        $receiptDate = $receipt->created_at
+            ? $receipt->created_at->format('Y-m-d')
+            : now()->format('Y-m-d');
+
+        $receivedAt = $receipt->received_at
+            ? $receipt->received_at->format('Y-m-d H:i:s')
+            : ($transmittal->received_at ? $transmittal->received_at->format('Y-m-d H:i:s') : 'N/A');
+
+        $preparedAt = $transmittal->prepared_at
+            ? $transmittal->prepared_at->format('Y-m-d H:i:s')
+            : ($transmittal->created_at ? $transmittal->created_at->format('Y-m-d H:i:s') : 'N/A');
+
+        $approvedAt = $transmittal->approved_at
+            ? $transmittal->approved_at->format('Y-m-d H:i:s')
+            : 'N/A';
+
+        $deliveryType = 'N/A';
+        if (($transmittal->delivery_type ?? '') === 'By Person' || ($transmittal->delivery_type ?? '') === 'by_person') {
+            $deliveryType = $transmittal->by_person_who
+                ? 'By Person - ' . $transmittal->by_person_who
+                : 'By Person';
+        } elseif (($transmittal->delivery_type ?? '') === 'Registered Mail' || ($transmittal->delivery_type ?? '') === 'registered_mail') {
+            $deliveryType = $transmittal->registered_mail_provider
+                ? 'Registered Mail - ' . $transmittal->registered_mail_provider
+                : 'Registered Mail';
+        } elseif (($transmittal->delivery_type ?? '') === 'Electronic' || ($transmittal->delivery_type ?? '') === 'electronic') {
+            $deliveryType = 'Electronic' . ($transmittal->electronic_method ? ' - ' . $transmittal->electronic_method : '');
+        }
+
+        $actions = collect([
+            $transmittal->action_delivery ? 'Delivery' : null,
+            $transmittal->action_pick_up ? 'Pick Up' : null,
+            $transmittal->action_drop_off ? 'Drop Off' : null,
+            $transmittal->action_email ? 'Email' : null,
+        ])->filter()->implode(', ');
+
+        if ($actions === '') {
+            $actions = collect($transmittal->delivery_actions ?? [])
+                ->map(fn ($action) => str($action)->replace('_', ' ')->title())
+                ->implode(', ') ?: '—';
+        }
+
+        $fromValue = ($transmittal->direction ?? $transmittal->mode ?? 'send') === 'send'
+            ? ($transmittal->origin_office ?: $transmittal->office_name ?: config('ordo.office_name'))
+            : ($transmittal->party_name ?: $receipt->recipient?->name ?: 'N/A');
+
+        $toValue = ($transmittal->direction ?? $transmittal->mode ?? 'send') === 'send'
+            ? ($receipt->recipient?->name ?: $transmittal->party_name ?: $transmittal->recipients->first()?->name ?: 'N/A')
+            : ($transmittal->origin_office ?: $transmittal->office_name ?: config('ordo.office_name'));
+
+        $approvedByText = ($transmittal->approver?->name ?? $transmittal->approved_by_name ?? 'N/A')
+            . ($transmittal->approved_position ? ' (' . $transmittal->approved_position . ')' : '');
+
+        $corporateContext = $this->transmittalCorporateContext();
+
+        $fileName = ($transmittal->tracking_number ?? ($transmittal->transmittal_no ?? 'TRN')) . '-PACKAGE-RECEIPT.pdf';
+
+        $response = Pdf::loadView('transmittal.package-pdf', [
             'transmittal' => $transmittal,
             'receipt' => $receipt,
-            'snapshot' => $receipt->snapshot ?? [],
-            'acknowledgmentProof' => $acknowledgmentProof,
-        ])->setPaper('a4')->download($receipt->receipt_code.'.pdf');
+            'receiptDate' => $receiptDate,
+            'receivedAt' => $receivedAt,
+            'preparedAt' => $preparedAt,
+            'approvedAt' => $approvedAt,
+            'deliveryType' => $deliveryType,
+            'actions' => $actions,
+            'fromValue' => $fromValue,
+            'toValue' => $toValue,
+            'approvedByText' => $approvedByText,
+            'corporateContext' => $corporateContext,
+        ])
+        ->setPaper('a4', 'portrait')
+        ->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
 
-        return $this->markPrivateFileResponse($response);
+        $basePdfContent = $response->output();
+
+        // Check for attached PDF documents to append their full pages
+        $pdfDocs = ($transmittal->documents ?? collect())->filter(function ($doc) {
+            $ext = strtolower(pathinfo($doc->original_name, PATHINFO_EXTENSION));
+            return ($ext === 'pdf' || $doc->mime_type === 'application/pdf')
+                && Storage::disk('local')->exists($doc->storage_path);
+        });
+
+        // Also check transmittal items with public/local attachment paths
+        $itemPdfPaths = ($transmittal->items ?? collect())->filter(function ($item) {
+            if (empty($item->attachment_path)) {
+                return false;
+            }
+            $ext = strtolower(pathinfo($item->attachment_path, PATHINFO_EXTENSION));
+            return $ext === 'pdf' && (
+                Storage::disk('public')->exists($item->attachment_path) ||
+                Storage::disk('local')->exists($item->attachment_path)
+            );
+        })->map(function ($item) {
+            return Storage::disk('public')->exists($item->attachment_path)
+                ? Storage::disk('public')->path($item->attachment_path)
+                : Storage::disk('local')->path($item->attachment_path);
+        });
+
+        if ($pdfDocs->isNotEmpty() || $itemPdfPaths->isNotEmpty()) {
+            try {
+                $fpdi = new \setasign\Fpdi\Fpdi();
+
+                // 1. Import base package pages (Cover, Form, Receipt, Manifest)
+                $tempBaseFile = tempnam(sys_get_temp_dir(), 'base_pkg_');
+                file_put_contents($tempBaseFile, $basePdfContent);
+                $basePageCount = $fpdi->setSourceFile($tempBaseFile);
+                for ($pageNo = 1; $pageNo <= $basePageCount; $pageNo++) {
+                    $templateId = $fpdi->importPage($pageNo);
+                    $size = $fpdi->getTemplateSize($templateId);
+                    $fpdi->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $fpdi->useTemplate($templateId);
+                }
+                @unlink($tempBaseFile);
+
+                // 2. Append all attached PDF documents with clear "ATTACHMENT" header banner
+                foreach ($pdfDocs as $pdfDoc) {
+                    $docFullPath = Storage::disk('local')->path($pdfDoc->storage_path);
+                    try {
+                        $docPageCount = $fpdi->setSourceFile($docFullPath);
+                        for ($pageNo = 1; $pageNo <= $docPageCount; $pageNo++) {
+                            $templateId = $fpdi->importPage($pageNo);
+                            $size = $fpdi->getTemplateSize($templateId);
+                            $fpdi->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                            $fpdi->useTemplate($templateId);
+
+                            // Add prominent ATTACHMENT top header banner
+                            $fpdi->SetFont('Arial', 'B', 8);
+                            $fpdi->SetTextColor(15, 23, 42);
+                            $fpdi->SetFillColor(241, 245, 249);
+                            $fpdi->SetDrawColor(203, 213, 225);
+                            $fpdi->Rect(5, 4, $size['width'] - 10, 6, 'DF');
+                            $fpdi->SetXY(8, 5.2);
+                            $headerText = 'ATTACHMENT: ' . strtoupper($pdfDoc->original_name) . ($docPageCount > 1 ? " (Page {$pageNo} of {$docPageCount})" : '');
+                            $fpdi->Cell($size['width'] - 16, 4, $headerText, 0, 0, 'L');
+                        }
+                    } catch (\Throwable $docErr) {
+                        \Log::warning("Could not merge attached PDF document ID {$pdfDoc->id}: " . $docErr->getMessage());
+                    }
+                }
+
+                // 3. Append all item attachment PDFs with clear "ATTACHMENT" header banner
+                foreach ($itemPdfPaths as $itemPath) {
+                    try {
+                        $docPageCount = $fpdi->setSourceFile($itemPath);
+                        $baseFileName = basename($itemPath);
+                        for ($pageNo = 1; $pageNo <= $docPageCount; $pageNo++) {
+                            $templateId = $fpdi->importPage($pageNo);
+                            $size = $fpdi->getTemplateSize($templateId);
+                            $fpdi->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                            $fpdi->useTemplate($templateId);
+
+                            // Add prominent ATTACHMENT top header banner
+                            $fpdi->SetFont('Arial', 'B', 8);
+                            $fpdi->SetTextColor(15, 23, 42);
+                            $fpdi->SetFillColor(241, 245, 249);
+                            $fpdi->SetDrawColor(203, 213, 225);
+                            $fpdi->Rect(5, 4, $size['width'] - 10, 6, 'DF');
+                            $fpdi->SetXY(8, 5.2);
+                            $headerText = 'ATTACHMENT: ' . strtoupper($baseFileName) . ($docPageCount > 1 ? " (Page {$pageNo} of {$docPageCount})" : '');
+                            $fpdi->Cell($size['width'] - 16, 4, $headerText, 0, 0, 'L');
+                        }
+                    } catch (\Throwable $itemErr) {
+                        \Log::warning("Could not merge item PDF attachment: " . $itemErr->getMessage());
+                    }
+                }
+
+                $mergedPdf = $fpdi->Output('S');
+
+                return $this->markPrivateFileResponse(
+                    response($mergedPdf, 200, [
+                        'Content-Type' => 'application/pdf',
+                        'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+                    ])
+                );
+            } catch (\Throwable $mergeErr) {
+                \Log::error("FPDI PDF merge failed, falling back to base package: " . $mergeErr->getMessage());
+            }
+        }
+
+        return $this->markPrivateFileResponse(
+            response($basePdfContent, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ])
+        );
     }
 
     private function markPrivateFileResponse(Response $response): Response
@@ -1690,5 +2040,639 @@ private function storeDocument(
         abort_unless($recipient && $recipient->sent_at, 404);
 
         return $recipient;
+    }
+
+    public function createFromProject(Project $project): RedirectResponse
+    {
+        $project->loadMissing([
+            'contact:id,first_name,last_name,email,company_name',
+            'company:id,company_name',
+        ]);
+
+        return redirect()->route('transmittal.index', [
+            'prefill' => json_encode($this->buildProjectPrefill($project, 'SOW')),
+        ]);
+    }
+
+    public function createFromRegular(Project $regular): RedirectResponse
+    {
+        $regular->loadMissing([
+            'contact:id,first_name,last_name,email,company_name',
+            'company:id,company_name',
+        ]);
+
+        return redirect()->route('transmittal.index', [
+            'prefill' => json_encode($this->buildProjectPrefill($regular, 'RSAT')),
+        ]);
+    }
+
+    public function data(Request $request): JsonResponse
+    {
+        $workflow = $request->get('workflow_status', 'uploaded');
+        $perPage = (int) $request->get('per_page', 10);
+
+        if ($perPage < 1) {
+            $perPage = 10;
+        }
+
+        $workflowMap = [
+            'uploaded' => 'Uploaded',
+            'submitted' => 'Submitted',
+            'accepted' => 'Accepted',
+            'reverted' => 'Reverted',
+            'archived' => 'Archived',
+        ];
+
+        $query = Transmittal::with(['items', 'receipt', 'attachments', 'recipients']);
+
+        // `status` is the source of truth; `workflow_status` can be stale, so it is only a fallback when status is NULL.
+        $statusMap = [
+            'uploaded' => ['draft'],
+            'submitted' => ['pending_approval'],
+            'accepted' => ['approved', 'sent', 'acknowledged'],
+            'reverted' => ['rejected'],
+            'archived' => ['cancelled'],
+        ];
+
+        if (isset($statusMap[$workflow])) {
+            $statuses = $statusMap[$workflow];
+            $label = $workflowMap[$workflow];
+            $query->where(function ($q) use ($statuses, $label) {
+                $q->whereIn('status', $statuses)
+                    ->orWhere(function ($sub) use ($label) {
+                        $sub->whereNull('status')->where('workflow_status', $label);
+                    });
+            });
+        }
+
+        $searchTerm = $request->string('q')->trim()->toString() ?: $request->string('search')->trim()->toString();
+        if ($searchTerm !== '') {
+            $term = '%'.addcslashes($searchTerm, '%_\\').'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('transmittal_no', 'like', $term)
+                    ->orWhere('tracking_number', 'like', $term)
+                    ->orWhere('subject', 'like', $term)
+                    ->orWhere('party_name', 'like', $term)
+                    ->orWhere('office_name', 'like', $term)
+                    ->orWhere('external_reference', 'like', $term)
+                    ->orWhere('origin_office', 'like', $term)
+                    ->orWhere('related_company', 'like', $term)
+                    ->orWhereHas('documents', fn ($documents) => $documents->where('original_name', 'like', $term))
+                    ->orWhereHas('recipients', fn ($recipients) => $recipients
+                        ->where('name', 'like', $term)
+                        ->orWhere('email', 'like', $term)
+                        ->orWhere('organization', 'like', $term));
+            });
+        }
+
+        $paginator = $query->latest()->paginate($perPage);
+
+        $rows = collect($paginator->items())
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'transmittal_no' => $item->transmittal_no ?? $item->tracking_number,
+                    'date' => optional($item->transmittal_date)->format('Y-m-d'),
+                    'mode' => strtoupper($item->direction ?? ($item->mode ?? 'SEND')),
+                    'from_value' => $item->from_value,
+                    'to_value' => $item->to_value,
+                    'delivery_type' => $item->delivery_summary,
+                    'actions' => $item->actions_summary,
+                    'workflow_status' => match ($item->status) {
+                        'draft' => 'Uploaded',
+                        'pending_approval' => 'Submitted',
+                        'approved', 'sent', 'acknowledged' => 'Accepted',
+                        'rejected' => 'Reverted',
+                        'cancelled' => 'Archived',
+                        default => $item->workflow_status ?? 'Uploaded',
+                    },
+                    'approval_status' => match ($item->status) {
+                        'approved', 'sent', 'acknowledged' => 'Approved',
+                        'rejected' => 'Rejected',
+                        default => $item->approval_status ?? 'Pending',
+                    },
+                    'party_name' => $item->party_name,
+                    'office_name' => $item->office_name,
+                    'address' => $item->address,
+                    'by_person_who' => $item->by_person_who,
+                    'registered_mail_provider' => $item->registered_mail_provider,
+                    'electronic_method' => $item->electronic_method,
+                    'recipient_email' => $item->recipient_email,
+                    'action_delivery' => $item->action_delivery,
+                    'action_pick_up' => $item->action_pick_up,
+                    'action_drop_off' => $item->action_drop_off,
+                    'action_email' => $item->action_email,
+                    'prepared_by_name' => $item->prepared_by_name,
+                    'prepared_at' => optional($item->prepared_at)->format('Y-m-d H:i'),
+                    'approved_by_name' => $item->approved_by_name,
+                    'approved_position' => $item->approved_position,
+                    'approved_at' => optional($item->approved_at)->format('Y-m-d H:i'),
+                    'document_custodian' => $item->document_custodian,
+                    'delivered_by' => $item->delivered_by,
+                    'received_by' => $item->received_by,
+                    'receiver_affiliation' => $item->receiver_affiliation,
+                    'received_at' => optional($item->received_at)->format('Y-m-d\TH:i'),
+                    'attachments_count' => $item->attachments ? $item->attachments->count() : 0,
+                    'items' => $item->items ? $item->items->map(function ($row) {
+                        return [
+                            'no' => $row->item_no ?? $row->no,
+                            'particular' => $row->particular,
+                            'unique_id' => $row->unique_id,
+                            'qty' => $row->qty ?? $row->quantity,
+                            'description' => $row->description,
+                            'remarks' => $row->remarks,
+                            'attachment_path' => $row->attachment_path,
+                            'attachment_url' => $row->attachment_path ? asset('storage/' . $row->attachment_path) : null,
+                        ];
+                    })->values() : [],
+                    'can_submit' => in_array($item->workflow_status ?? $item->status, ['Uploaded', 'Reverted', 'draft', 'rejected'], true),
+                    'preview_url' => route('transmittal.preview', $item->id),
+                    'workspace_url' => route('transmittals.workspace', $item->id),
+                    'receipt_id' => optional($item->receipt)->id,
+                    'receipt_no' => optional($item->receipt)->receipt_no,
+                    'receipt_url' => $item->receipt ? route('transmittal.receipts.show', $item->receipt->id) : null,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'data' => $rows,
+            'pagination' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'from' => $paginator->firstItem(),
+                'to' => $paginator->lastItem(),
+                'has_more_pages' => $paginator->hasMorePages(),
+            ],
+        ]);
+    }
+
+    public function submit($id): JsonResponse
+    {
+        $transmittal = Transmittal::findOrFail($id);
+
+        if (! in_array($transmittal->workflow_status ?? $transmittal->status, ['Uploaded', 'Reverted', 'draft', 'rejected'], true)) {
+            return response()->json(['message' => 'Only uploaded or reverted transmittals can be submitted.'], 422);
+        }
+
+        $transmittal->update([
+            'workflow_status' => 'Submitted',
+            'status' => 'pending_approval',
+            'approval_status' => 'Pending',
+            'submitted_by' => Auth::id(),
+        ]);
+
+        return response()->json(['message' => 'Transmittal submitted for approval successfully.']);
+    }
+
+    public function preview($id): View
+    {
+        $transmittal = Transmittal::with(['items', 'receipt', 'attachments'])->findOrFail($id);
+
+        $transmittalPdfUrl = route('transmittal.preview.pdf', $transmittal->id);
+        $receiptPdfUrl = $transmittal->receipt
+            ? route('transmittal.receipt.pdf', $transmittal->id)
+            : null;
+
+        $corporateContext = $this->transmittalCorporateContext();
+
+        return view('transmittal.preview', compact('transmittal', 'transmittalPdfUrl', 'receiptPdfUrl', 'corporateContext'));
+    }
+
+    public function previewPdf($id): Response
+    {
+        $transmittal = Transmittal::with(['items', 'receipt', 'attachments'])->findOrFail($id);
+
+        $approvedByDisplay = $this->resolveApprovedByName($transmittal);
+        $corporateContext = $this->transmittalCorporateContext();
+
+        $pdf = Pdf::loadView('transmittal.preview-pdf', [
+                'transmittal' => $transmittal,
+                'approvedByDisplay' => $approvedByDisplay,
+                'corporateContext' => $corporateContext,
+            ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
+
+        return $pdf->stream('transmittal-' . ($transmittal->transmittal_no ?? $transmittal->tracking_number) . '.pdf');
+    }
+
+    public function sendEmail($id): RedirectResponse
+    {
+        $transmittal = Transmittal::with(['items', 'receipt', 'attachments'])->findOrFail($id);
+
+        $recipient = trim((string) $transmittal->recipient_email);
+        if ($recipient === '') {
+            return back()->with('error', 'Recipient email is required before sending the transmittal.');
+        }
+
+        $approvedByDisplay = $this->resolveApprovedByName($transmittal);
+        $corporateContext = $this->transmittalCorporateContext();
+
+        $pdf = Pdf::loadView('transmittal.preview-pdf', [
+                'transmittal' => $transmittal,
+                'approvedByDisplay' => $approvedByDisplay,
+                'corporateContext' => $corporateContext,
+            ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions(['isPhpEnabled' => true, 'isRemoteEnabled' => true]);
+
+        $pdfFileName = 'transmittal-' . Str::slug((string) ($transmittal->transmittal_no ?? $transmittal->tracking_number), '-') . '.pdf';
+        $pdfOutput = $pdf->output();
+
+        $fileAttachments = [];
+
+        foreach ($transmittal->items as $item) {
+            if (! empty($item->attachment_path) && Storage::disk('public')->exists($item->attachment_path)) {
+                $fileAttachments[] = [
+                    'path' => Storage::disk('public')->path($item->attachment_path),
+                    'name' => basename($item->attachment_path),
+                ];
+            }
+        }
+
+        if ($transmittal->attachments) {
+            foreach ($transmittal->attachments as $attachment) {
+                if (! empty($attachment->file_path) && Storage::disk('public')->exists($attachment->file_path)) {
+                    $fileAttachments[] = [
+                        'path' => Storage::disk('public')->path($attachment->file_path),
+                        'name' => $attachment->original_name ?: basename($attachment->file_path),
+                    ];
+                }
+            }
+        }
+
+        $emailSubject = 'Transmittal Form ' . ($transmittal->transmittal_no ?? $transmittal->tracking_number);
+        $htmlContent = view('emails.transmittal-sent', [
+            'transmittal' => $transmittal,
+            'corporateContext' => $corporateContext,
+        ])->render();
+
+        $brevoApiKey = config('ordo.brevo.api_key');
+        $brevoSender = config('ordo.brevo.sender_email');
+
+        if (filled($brevoApiKey) && filled($brevoSender)) {
+            try {
+                app(BrevoTransmittalService::class)->sendTransmittalDocument(
+                    $recipient,
+                    $emailSubject,
+                    $htmlContent,
+                    $pdfOutput,
+                    $pdfFileName,
+                    $fileAttachments
+                );
+
+                return back()->with('success', 'Transmittal email sent successfully to ' . $recipient . ' via verified delivery.');
+            } catch (\Throwable $e) {
+                \Log::warning('Brevo direct transmission failed, falling back to mailer: ' . $e->getMessage());
+            }
+        }
+
+        Mail::send([], [], function ($message) use ($recipient, $transmittal, $emailSubject, $htmlContent, $pdfOutput, $pdfFileName, $fileAttachments) {
+            $senderEmail = config('ordo.brevo.sender_email') ?: config('mail.from.address');
+            $senderName = config('ordo.brevo.sender_name') ?: config('mail.from.name');
+
+            $message->to($recipient)
+                ->from($senderEmail, $senderName)
+                ->replyTo($senderEmail, $senderName)
+                ->subject($emailSubject)
+                ->html($htmlContent)
+                ->attachData($pdfOutput, $pdfFileName, ['mime' => 'application/pdf']);
+
+            foreach ($fileAttachments as $attachment) {
+                $message->attach($attachment['path'], ['as' => $attachment['name']]);
+            }
+        });
+
+        return back()->with('success', 'Transmittal email sent successfully to ' . $recipient . '.');
+    }
+
+    private function buildProjectPrefill(Project $project, string $sourceLabel): array
+    {
+        $formCode = $sourceLabel === 'RSAT' ? 'REG-F-004' : 'PROJ-F-006';
+        $contactName = trim(collect([
+            $project->contact?->first_name,
+            $project->contact?->last_name,
+        ])->filter()->implode(' '));
+
+        $externalParty = $contactName
+            ?: ($project->client_name ?: ($project->company?->company_name ?: ''));
+
+        $officeName = $project->business_name
+            ?: ($project->company?->company_name ?: 'John Kelly & Company');
+
+        $projectCode = $project->project_code ?: ('PROJECT-' . $project->id);
+        $clientEmail = $project->contact?->email;
+        $services = trim((string) $project->services);
+        $products = trim((string) $project->products);
+        $scopeSummary = trim((string) $project->scope_summary);
+
+        $descriptionParts = array_values(array_filter([
+            $project->name ? "Engagement: {$project->name}" : null,
+            $services !== '' ? "Services: {$services}" : null,
+            $products !== '' ? "Products: {$products}" : null,
+            $scopeSummary !== '' ? "Scope: {$scopeSummary}" : null,
+        ]));
+
+        return [
+            'source_type' => strtolower($sourceLabel),
+            'source_id' => $project->id,
+            'source_label' => $sourceLabel,
+            'form_code' => $formCode,
+            'transmittal_date' => now()->toDateString(),
+            'mode' => 'SEND',
+            'party_name' => $externalParty,
+            'office_name' => $officeName,
+            'address' => '',
+            'delivery_type' => $clientEmail ? 'Electronic' : '',
+            'electronic_method' => $clientEmail ? 'Email' : '',
+            'recipient_email' => $clientEmail,
+            'action_delivery' => false,
+            'action_pick_up' => false,
+            'action_drop_off' => false,
+            'action_email' => (bool) $clientEmail,
+            'prepared_by_name' => (string) ($project->assigned_associate ?: ''),
+            'approved_by_name' => (string) ($project->assigned_consultant ?: ''),
+            'approved_position' => 'Operations Manager',
+            'document_custodian' => '',
+            'delivered_by' => '',
+            'received_by' => $externalParty,
+            'received_at' => '',
+            'items' => [[
+                'no' => 1,
+                'particular' => "{$sourceLabel} Documents",
+                'unique_id' => $projectCode,
+                'qty' => 1,
+                'description' => implode(' | ', $descriptionParts),
+                'remarks' => "{$sourceLabel} generated from {$projectCode}",
+            ]],
+        ];
+    }
+
+    private function transmittalContactOptions(): array
+    {
+        if (! Schema::hasTable('contacts')) {
+            return [];
+        }
+
+        $columns = Schema::getColumnListing('contacts');
+        $select = array_values(array_intersect([
+            'id', 'first_name', 'middle_name', 'middle_initial', 'last_name', 'name_extension',
+            'company_name', 'email', 'phone'
+        ], $columns));
+
+        if (! in_array('id', $select, true)) {
+            $select[] = 'id';
+        }
+
+        return DB::table('contacts')
+            ->select($select)
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get()
+            ->map(function ($contact) {
+                $fullName = trim(collect([
+                    $contact->first_name ?? null,
+                    $contact->middle_initial ?? null,
+                    $contact->middle_name ?? null,
+                    $contact->last_name ?? null,
+                    $contact->name_extension ?? null,
+                ])->filter()->implode(' '));
+
+                $company = trim((string) ($contact->company_name ?? ''));
+                $label = $fullName !== '' ? $fullName : ($company !== '' ? $company : 'Contact #' . $contact->id);
+
+                return [
+                    'id' => $contact->id,
+                    'type' => 'contact',
+                    'label' => $label,
+                    'affiliation' => $company,
+                    'email' => $contact->email ?? '',
+                    'phone' => $contact->phone ?? '',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function transmittalEmployeeOptions(): array
+    {
+        if (Schema::hasTable('employees')) {
+            $columns = Schema::getColumnListing('employees');
+            $select = array_values(array_intersect([
+                'id', 'employee_id', 'full_name', 'first_name', 'middle_name', 'last_name',
+                'work_email', 'company_email', 'personal_email', 'email', 'department', 'position'
+            ], $columns));
+
+            if (! in_array('id', $select, true)) {
+                $select[] = 'id';
+            }
+
+            return DB::table('employees')
+                ->select($select)
+                ->orderByDesc('id')
+                ->limit(500)
+                ->get()
+                ->map(function ($employee) {
+                    $fullName = trim((string) ($employee->full_name ?? ''));
+
+                    if ($fullName === '') {
+                        $fullName = trim(collect([
+                            $employee->first_name ?? null,
+                            $employee->middle_name ?? null,
+                            $employee->last_name ?? null,
+                        ])->filter()->implode(' '));
+                    }
+
+                    return [
+                        'id' => $employee->id,
+                        'type' => 'employee',
+                        'label' => $fullName !== '' ? $fullName : 'Employee #' . $employee->id,
+                        'affiliation' => trim((string) ($employee->department ?? '')),
+                        'email' => $employee->work_email ?? ($employee->company_email ?? ($employee->email ?? ($employee->personal_email ?? ''))),
+                        'position' => $employee->position ?? '',
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
+        if (! Schema::hasTable('users')) {
+            return [];
+        }
+
+        return DB::table('users')
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->limit(500)
+            ->get()
+            ->map(fn ($user) => [
+                'id' => $user->id,
+                'type' => 'employee',
+                'label' => $user->name ?: $user->email,
+                'affiliation' => 'Employee',
+                'email' => $user->email ?? '',
+                'position' => '',
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function transmittalCompanyOptions(): array
+    {
+        if (! Schema::hasTable('companies')) {
+            return [];
+        }
+
+        $columns = Schema::getColumnListing('companies');
+        $select = array_values(array_intersect(['id', 'company_name', 'name', 'email', 'address'], $columns));
+
+        if (! in_array('id', $select, true)) {
+            $select[] = 'id';
+        }
+
+        return DB::table('companies')
+            ->select($select)
+            ->orderByDesc('id')
+            ->limit(500)
+            ->get()
+            ->map(function ($company) {
+                $label = trim((string) ($company->company_name ?? ($company->name ?? '')));
+
+                return [
+                    'id' => $company->id,
+                    'label' => $label !== '' ? $label : 'Company #' . $company->id,
+                    'email' => $company->email ?? '',
+                    'address' => $company->address ?? '',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function resolveApprovedByName(Transmittal $transmittal): string
+    {
+        if (! empty($transmittal->approved_by) && Schema::hasTable('users')) {
+            $userColumns = Schema::getColumnListing('users');
+            $nameColumn = in_array('name', $userColumns, true) ? 'name' : (in_array('email', $userColumns, true) ? 'email' : null);
+
+            if ($nameColumn) {
+                $name = DB::table('users')
+                    ->where('id', $transmittal->approved_by)
+                    ->value($nameColumn);
+
+                if (trim((string) $name) !== '') {
+                    return trim((string) $name);
+                }
+            }
+        }
+
+        return trim((string) ($transmittal->approved_by_name ?? ''));
+    }
+
+    private function transmittalCorporateContext(): array
+    {
+        $fallback = [
+            'companyName' => 'John Kelly & Company',
+            'secRegNo' => '',
+            'principalAddress' => '',
+            'logoUrl' => asset('images/FINAL_LOGO.jpg'),
+            'logoBase64' => null,
+        ];
+
+        if (! Schema::hasTable('gis_records')) {
+            return $fallback;
+        }
+
+        $buildCorporateGisQuery = function () {
+            $query = DB::table('gis_records');
+
+            if (Schema::hasColumn('gis_records', 'company_id')) {
+                $query->whereNull('company_id');
+            }
+
+            return $query;
+        };
+
+        $query = $buildCorporateGisQuery();
+
+        if (Schema::hasColumn('gis_records', 'workflow_status')) {
+            $query->where(function ($q) {
+                $q->where('workflow_status', 'Accepted');
+
+                if (Schema::hasColumn('gis_records', 'approval_status')) {
+                    $q->orWhere('approval_status', 'Approved')
+                        ->orWhere('approval_status', 'Accepted');
+                }
+
+                if (Schema::hasColumn('gis_records', 'submission_status')) {
+                    $q->orWhere('submission_status', 'Accepted')
+                        ->orWhere('submission_status', 'Approved');
+                }
+            });
+        } elseif (Schema::hasColumn('gis_records', 'approval_status')) {
+            $query->where(function ($q) {
+                $q->where('approval_status', 'Approved')
+                    ->orWhere('approval_status', 'Accepted');
+            });
+        }
+
+        $gis = $query
+            ->latest('updated_at')
+            ->latest('created_at')
+            ->latest('id')
+            ->first();
+
+        if (! $gis) {
+            $gis = $buildCorporateGisQuery()
+                ->latest('updated_at')
+                ->latest('created_at')
+                ->latest('id')
+                ->first();
+        }
+
+        if (! $gis) {
+            return $fallback;
+        }
+
+        $companyName = trim((string) ($gis->corporation_name ?? '')) ?: $fallback['companyName'];
+        $secRegNo = trim((string) ($gis->company_reg_no ?? ''));
+        $principalAddress = trim((string) ($gis->principal_address ?? ($gis->business_address ?? '')));
+        $logoPath = trim((string) ($gis->logo_path ?? ''));
+
+        $logoUrl = $fallback['logoUrl'];
+        $logoBase64 = null;
+
+        if ($logoPath !== '') {
+            $normalizedLogoPath = preg_replace('#^/?storage/#', '', $logoPath);
+
+            if (Storage::disk('public')->exists($normalizedLogoPath)) {
+                $absoluteLogoPath = Storage::disk('public')->path($normalizedLogoPath);
+                $mime = function_exists('mime_content_type')
+                    ? (mime_content_type($absoluteLogoPath) ?: 'image/png')
+                    : 'image/png';
+
+                $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
+                $logoUrl = asset('storage/' . $normalizedLogoPath);
+            } elseif (file_exists(public_path($normalizedLogoPath))) {
+                $absoluteLogoPath = public_path($normalizedLogoPath);
+                $mime = function_exists('mime_content_type')
+                    ? (mime_content_type($absoluteLogoPath) ?: 'image/png')
+                    : 'image/png';
+
+                $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($absoluteLogoPath));
+                $logoUrl = asset($normalizedLogoPath);
+            }
+        }
+
+        return [
+            'companyName' => $companyName,
+            'secRegNo' => $secRegNo,
+            'principalAddress' => $principalAddress,
+            'logoUrl' => $logoUrl,
+            'logoBase64' => $logoBase64,
+        ];
     }
 }

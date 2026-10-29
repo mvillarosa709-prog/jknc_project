@@ -63,13 +63,16 @@
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
                     <div class="lg:col-span-6">
                         <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Search</label>
-                        <input
-                            type="text"
-                            name="search"
-                            value="{{ request('search') }}"
-                            placeholder="Search policy title, code, prepared by..."
-                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
-                        >
+                        <div class="relative w-full">
+                            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                            <input
+                                type="text"
+                                name="search"
+                                value="{{ request('search') }}"
+                                placeholder="Search"
+                                class="w-full bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-full pl-11 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition"
+                            >
+                        </div>
                     </div>
 
                     <div class="lg:col-span-3">

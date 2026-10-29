@@ -9,19 +9,37 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('transmittals', function (Blueprint $table) {
-            $table->string('direction')->default('send');
-            $table->date('transmittal_date')->nullable();
-            $table->string('origin_office')->nullable();
-            $table->text('recipient_address')->nullable();
-            $table->string('related_company')->nullable();
-            $table->string('delivery_method')->default('electronic');
-            $table->string('edit_token_hash', 64)->nullable()->unique();
-        });
+        if (Schema::hasTable('transmittals')) {
+            Schema::table('transmittals', function (Blueprint $table) {
+                if (!Schema::hasColumn('transmittals', 'direction')) {
+                    $table->string('direction')->default('send');
+                }
+                if (!Schema::hasColumn('transmittals', 'transmittal_date')) {
+                    $table->date('transmittal_date')->nullable();
+                }
+                if (!Schema::hasColumn('transmittals', 'origin_office')) {
+                    $table->string('origin_office')->nullable();
+                }
+                if (!Schema::hasColumn('transmittals', 'recipient_address')) {
+                    $table->text('recipient_address')->nullable();
+                }
+                if (!Schema::hasColumn('transmittals', 'related_company')) {
+                    $table->string('related_company')->nullable();
+                }
+                if (!Schema::hasColumn('transmittals', 'delivery_method')) {
+                    $table->string('delivery_method')->default('electronic');
+                }
+                if (!Schema::hasColumn('transmittals', 'edit_token_hash')) {
+                    $table->string('edit_token_hash', 64)->nullable()->unique();
+                }
+            });
 
-        DB::table('transmittals')->whereNull('transmittal_date')->update([
-            'transmittal_date' => DB::raw('DATE(created_at)'),
-        ]);
+            if (Schema::hasColumn('transmittals', 'transmittal_date')) {
+                DB::table('transmittals')->whereNull('transmittal_date')->update([
+                    'transmittal_date' => DB::raw('DATE(created_at)'),
+                ]);
+            }
+        }
     }
 
     public function down(): void

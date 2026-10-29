@@ -19,7 +19,7 @@ class ExternalAcknowledgmentController extends Controller
     public function show(string $token): View
     {
         $recipient = $this->recipientFor($token);
-        $recipient->transmittal->load('documents');
+        $recipient->transmittal->load(['documents', 'items.document', 'recipients']);
         $sentProof = $recipient->proofs()
             ->where('status', 'sent')
             ->latest('transmitted_at')
@@ -74,14 +74,15 @@ class ExternalAcknowledgmentController extends Controller
     {
         $validated = $request->validate([
             'signed_name' => ['required', 'string', 'max:160'],
-            'location' => ['nullable', 'string', 'max:200'],
             'comments' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $recipient = $this->recipientFor($token);
+        $clientIp = (string) $request->ip();
+        $autoLocation = $this->resolveLocationFromIp($clientIp);
 
-        Cache::lock("ordo:acknowledgment:{$recipient->id}")->block(10, function () use ($request, $recipient, $validated): void {
-            DB::transaction(function () use ($request, $recipient, $validated): void {
+        Cache::lock("ordo:acknowledgment:{$recipient->id}")->block(10, function () use ($request, $recipient, $validated, $autoLocation, $clientIp): void {
+            DB::transaction(function () use ($request, $recipient, $validated, $autoLocation, $clientIp): void {
                 $locked = TransmittalRecipient::query()
                     ->with('transmittal')
                     ->lockForUpdate()
@@ -92,22 +93,28 @@ class ExternalAcknowledgmentController extends Controller
                 }
 
                 $receivedAt = now();
+                $receiptCode = 'ORDO-TRR-'.strtoupper(Str::random(18));
+                $nextReceiptId = ((int) TransmittalReceipt::query()->max('id')) + 1;
+                $receiptNo = 'TRR-' . str_pad((string) $nextReceiptId, 5, '0', STR_PAD_LEFT);
                 $receipt = TransmittalReceipt::query()->create([
                     'transmittal_id' => $locked->transmittal_id,
                     'recipient_id' => $locked->id,
+                    'receipt_no' => $receiptNo,
+                    'receipt_date' => $receivedAt->toDateString(),
                     'signed_name' => $validated['signed_name'],
+                    'received_by' => $validated['signed_name'],
                     'comments' => $validated['comments'] ?? null,
-                    'receipt_code' => 'ORDO-TRR-'.strtoupper(Str::random(18)),
+                    'receipt_code' => $receiptCode,
                     'snapshot' => [
                         'tracking_number' => $locked->transmittal->tracking_number,
                         'subject' => $locked->transmittal->subject,
                         'recipient_email' => $locked->email,
                         'signed_name' => $validated['signed_name'],
-                        'location' => $validated['location'] ?? null,
+                        'location' => $autoLocation,
                         'comments' => $validated['comments'] ?? null,
                     ],
                     'received_at' => $receivedAt,
-                    'ip_address' => $request->ip(),
+                    'ip_address' => $clientIp,
                     'user_agent' => substr((string) $request->userAgent(), 0, 1000),
                 ]);
 
@@ -119,7 +126,8 @@ class ExternalAcknowledgmentController extends Controller
                     'details' => [
                         'receipt_code' => $receipt->receipt_code,
                         'signed_name' => $validated['signed_name'],
-                        'location' => $validated['location'] ?? null,
+                        'location' => $autoLocation,
+                        'ip_address' => $clientIp,
                         'device' => substr((string) $request->userAgent(), 0, 1000),
                     ],
                     'occurred_at' => $receivedAt,
@@ -138,7 +146,7 @@ class ExternalAcknowledgmentController extends Controller
                         'provider_metadata' => [
                             'receipt_code' => $receipt->receipt_code,
                             'acknowledged_by' => $validated['signed_name'],
-                            'location' => $validated['location'] ?? null,
+                            'location' => $autoLocation,
                             'device' => substr((string) $request->userAgent(), 0, 1000),
                             'ip_address' => $request->ip(),
                             'user_agent' => substr((string) $request->userAgent(), 0, 1000),
@@ -179,5 +187,35 @@ class ExternalAcknowledgmentController extends Controller
         abort_unless($recipient && $recipient->sent_at, 404);
 
         return $recipient;
+    }
+
+    private function resolveLocationFromIp(string $ip): string
+    {
+        if (in_array($ip, ['127.0.0.1', '::1', 'localhost'], true) || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.')) {
+            return 'Localhost / Internal Network';
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(2)
+                ->get("http://ip-api.com/json/{$ip}?fields=status,city,regionName,country");
+
+            if ($response->successful()) {
+                $data = $response->json();
+                if (($data['status'] ?? '') === 'success') {
+                    $parts = array_filter([
+                        $data['city'] ?? null,
+                        $data['regionName'] ?? null,
+                        $data['country'] ?? null,
+                    ]);
+                    if (! empty($parts)) {
+                        return implode(', ', $parts);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silently fallback if external lookup is unreachable
+        }
+
+        return "Auto-detected IP ({$ip})";
     }
 }

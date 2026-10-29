@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('transmittals', function (Blueprint $table) {
-            $table->string('external_reference', 120)->nullable()->after('tracking_number');
+            $table->string('external_reference', 120)->nullable();
         });
     }
 

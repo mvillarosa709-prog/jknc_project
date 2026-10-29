@@ -416,49 +416,72 @@ const stopCamera = () => {
     document.body.classList.remove('proof-modal-open');
 };
 
+let cameraFacingMode = 'environment';
+
+const startCameraStream = async () => {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        cameraStream = null;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+        if (cameraMessage) {
+            cameraMessage.textContent = 'Live camera stream is not supported by your browser or connection. Choose a photo/video file instead.';
+        }
+        return false;
+    }
+
+    try {
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: cameraFacingMode } },
+                audio: true
+            });
+        } catch {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: cameraFacingMode } },
+                audio: false
+            });
+        }
+        if (cameraPreview) {
+            cameraPreview.srcObject = cameraStream;
+            await cameraPreview.play();
+        }
+        if (cameraPhotoButton) cameraPhotoButton.disabled = false;
+        if (cameraRecordButton) cameraRecordButton.disabled = !window.MediaRecorder;
+        if (cameraMessage) cameraMessage.textContent = 'Capture a photo or record a video, then use it as the proof file.';
+        return true;
+    } catch (error) {
+        console.warn('getUserMedia error:', error);
+        if (cameraMessage) {
+            cameraMessage.textContent = error.name === 'NotAllowedError'
+                ? 'Camera permission was denied. Allow camera access in your browser or choose a file instead.'
+                : 'Could not access the camera. Tap "Choose file instead" to capture using your device camera or gallery.';
+        }
+        return false;
+    }
+};
+
 document.querySelectorAll('[data-open-proof-file]').forEach((button) => {
     button.addEventListener('click', async () => {
-        const panel = button.closest('[data-action-panel]');
-        const form = panel?.querySelector('#proof-upload-form');
-        if (!form || !cameraModal || !cameraPreview) {
-            const feedback = panel?.querySelector('[data-action-feedback-message]');
-            if (feedback && button.dataset.actionFeedback) {
-                feedback.textContent = button.dataset.actionFeedback;
-                feedback.hidden = false;
-            }
-            return;
-        }
+        const panel = button.closest('[data-action-panel]') || document.querySelector('[data-action-panel]');
+        const form = panel?.querySelector('#proof-upload-form') || document.querySelector('#proof-upload-form');
 
         cameraModal.hidden = false;
         document.body.classList.add('proof-modal-open');
         cameraFile = null;
-        cameraUseButton.disabled = true;
-        cameraPhotoButton.disabled = true;
-        cameraRecordButton.disabled = true;
-        cameraMessage.textContent = 'Requesting camera access…';
+        if (cameraUseButton) cameraUseButton.disabled = true;
+        if (cameraPhotoButton) cameraPhotoButton.disabled = true;
+        if (cameraRecordButton) cameraRecordButton.disabled = true;
+        if (cameraMessage) cameraMessage.textContent = 'Requesting camera access…';
 
-        if (!navigator.mediaDevices?.getUserMedia) {
-            cameraMessage.textContent = 'Camera access is not available in this browser. Choose a photo or video file instead.';
-            return;
-        }
-
-        try {
-            try {
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: true });
-            } catch {
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-            }
-            cameraPreview.srcObject = cameraStream;
-            await cameraPreview.play();
-            cameraPhotoButton.disabled = false;
-            cameraRecordButton.disabled = !window.MediaRecorder;
-            cameraMessage.textContent = 'Capture a photo or record a video, then use it as the proof file.';
-        } catch (error) {
-            cameraMessage.textContent = error.name === 'NotAllowedError'
-                ? 'Camera permission was denied. Allow camera access in your browser or choose a file instead.'
-                : 'Could not start the camera. Choose a photo or video file instead.';
-        }
+        await startCameraStream();
     });
+});
+
+document.querySelector('[data-camera-switch]')?.addEventListener('click', async () => {
+    cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    if (cameraMessage) cameraMessage.textContent = 'Switching camera…';
+    await startCameraStream();
 });
 
 cameraPhotoButton?.addEventListener('click', () => {
@@ -468,12 +491,12 @@ cameraPhotoButton?.addEventListener('click', () => {
     cameraCanvas.getContext('2d')?.drawImage(cameraPreview, 0, 0);
     cameraCanvas.toBlob((blob) => {
         if (!blob) {
-            cameraMessage.textContent = 'Could not capture the photo. Please try again.';
+            if (cameraMessage) cameraMessage.textContent = 'Could not capture the photo. Please try again.';
             return;
         }
         cameraFile = new File([blob], `transmission-proof-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        cameraUseButton.disabled = false;
-        cameraMessage.textContent = 'Photo captured. Select “Use captured file” to attach it to the proof record.';
+        if (cameraUseButton) cameraUseButton.disabled = false;
+        if (cameraMessage) cameraMessage.textContent = 'Photo captured! Select "Use captured file" to attach it to the proof record.';
     }, 'image/jpeg', 0.92);
 });
 
@@ -487,18 +510,18 @@ cameraRecordButton?.addEventListener('click', () => {
             const type = cameraRecorder?.mimeType || 'video/webm';
             const extension = type.includes('mp4') ? 'mp4' : 'webm';
             cameraFile = new File([new Blob(cameraChunks, { type })], `transmission-proof-${Date.now()}.${extension}`, { type });
-            cameraUseButton.disabled = false;
-            cameraRecordButton.hidden = false;
-            cameraStopButton.hidden = true;
-            cameraMessage.textContent = 'Video recorded. Select “Use captured file” to attach it to the proof record.';
+            if (cameraUseButton) cameraUseButton.disabled = false;
+            if (cameraRecordButton) cameraRecordButton.hidden = false;
+            if (cameraStopButton) cameraStopButton.hidden = true;
+            if (cameraMessage) cameraMessage.textContent = 'Video recorded! Select "Use captured file" to attach it to the proof record.';
         });
         cameraRecorder.start();
         cameraRecordButton.hidden = true;
-        cameraStopButton.hidden = false;
-        cameraUseButton.disabled = true;
-        cameraMessage.textContent = 'Recording video… select Stop recording when finished.';
+        if (cameraStopButton) cameraStopButton.hidden = false;
+        if (cameraUseButton) cameraUseButton.disabled = true;
+        if (cameraMessage) cameraMessage.textContent = 'Recording video… select Stop recording when finished.';
     } catch {
-        cameraMessage.textContent = 'Video recording is not supported by this camera/browser. You can still capture a photo or choose a video file.';
+        if (cameraMessage) cameraMessage.textContent = 'Video recording is not supported by this camera/browser. You can still capture a photo or choose a video file.';
     }
 });
 
@@ -507,19 +530,34 @@ cameraStopButton?.addEventListener('click', () => {
 });
 
 document.querySelectorAll('[data-close-camera]').forEach((button) => button.addEventListener('click', stopCamera));
+
 document.querySelector('[data-camera-browse]')?.addEventListener('click', () => {
-    const panel = cameraModal?.closest('[data-action-panel]');
-    stopCamera();
-    panel?.querySelector('#proof-file')?.click();
+    const nativeFallback = document.querySelector('#camera-native-fallback');
+    if (nativeFallback) {
+        nativeFallback.click();
+    } else {
+        const fileInput = document.querySelector('#proof-file');
+        stopCamera();
+        fileInput?.click();
+    }
 });
 
-cameraUseButton?.addEventListener('click', () => {
-    if (!cameraFile || !proofInput) return;
+document.querySelector('#camera-native-fallback')?.addEventListener('change', (e) => {
+    const file = e.target?.files?.[0];
+    if (file) {
+        cameraFile = file;
+        attachCameraFileToProofForm();
+    }
+});
+
+const attachCameraFileToProofForm = () => {
+    const fileInput = document.querySelector('#proof-file');
+    if (!cameraFile || !fileInput) return;
     const transfer = new DataTransfer();
     transfer.items.add(cameraFile);
-    proofInput.files = transfer.files;
-    proofInput.dispatchEvent(new Event('change', { bubbles: true }));
-    const form = proofInput.closest('#proof-upload-form');
+    fileInput.files = transfer.files;
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    const form = fileInput.closest('#proof-upload-form');
     const proofModal = form?.closest('[data-proof-modal]');
     stopCamera();
     if (proofModal) {
@@ -529,6 +567,10 @@ cameraUseButton?.addEventListener('click', () => {
         const feedback = proofModal.querySelector('[data-proof-file-hint]');
         if (feedback) feedback.textContent = `${cameraFile.name} is attached. Complete the fields and select Save proof record to add it to the table.`;
     }
+};
+
+cameraUseButton?.addEventListener('click', () => {
+    attachCameraFileToProofForm();
 });
 document.querySelectorAll('[data-action-tab]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -800,10 +842,10 @@ const syncWorkspacePreview = () => {
     }
 
     const direction = draftForm?.querySelector('[name="direction"]')?.value || 'send';
-    const office = draftForm?.querySelector('[name="origin_office"]')?.value.trim() || '—';
+    const office = draftForm?.querySelector('[name="origin_office"]')?.value.trim() || '';
     const recipient = draftForm?.querySelector('[name="recipients[0][name]"]')?.value.trim()
         || draftForm?.querySelector('[name="related_company"]')?.value.trim()
-        || '—';
+        || '';
     document.querySelectorAll('[data-preview-output="from"]').forEach((output) => {
         output.textContent = direction === 'receive' ? recipient : office;
     });
@@ -815,7 +857,7 @@ const syncWorkspacePreview = () => {
         .map((input) => input.parentElement.textContent.trim())
         .join(', ');
     document.querySelectorAll('[data-preview-output="delivery-actions"]').forEach((output) => {
-        output.textContent = deliveryActions || 'â€”';
+        output.textContent = deliveryActions || '';
     });
 
     const preparedAt = document.querySelector('input[name="prepared_at"]');
@@ -851,9 +893,9 @@ const syncWorkspacePreview = () => {
         } else {
             itemRows.forEach((item) => {
                 const row = document.createElement('tr');
-                [item.particular, item.unique_id, item.quantity, [item.description, item.remarks].filter(Boolean).join(' Â· ')].forEach((value) => {
+                [item.particular, item.unique_id, item.quantity, [item.description, item.remarks].filter(Boolean).join(' · ')].forEach((value) => {
                     const cell = document.createElement('td');
-                    cell.textContent = value || 'â€”';
+                    cell.textContent = value || '';
                     row.append(cell);
                 });
                 previewItems.append(row);
@@ -861,13 +903,14 @@ const syncWorkspacePreview = () => {
         }
     }
     const formPreviewItems = document.querySelector('[data-preview-form-items]');
-    if (formPreviewItems) {
+    const hasItemForm = Boolean(document.querySelector('#item-list, .item-editor-row, .item-row'));
+    if (formPreviewItems && hasItemForm) {
         formPreviewItems.replaceChildren();
         if (itemRows.length === 0) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
             cell.colSpan = 7;
-            cell.textContent = 'Items will appear here as they are added.';
+            cell.textContent = '';
             row.append(cell);
             formPreviewItems.append(row);
         } else {
@@ -876,7 +919,7 @@ const syncWorkspacePreview = () => {
                 [String(index + 1), item.particular, item.unique_id, item.quantity, item.description, item.remarks, item.attachment]
                     .forEach((value) => {
                         const cell = document.createElement('td');
-                        cell.textContent = value || 'â€”';
+                        cell.textContent = value || '';
                         row.append(cell);
                     });
                 formPreviewItems.append(row);
@@ -1328,7 +1371,7 @@ const proofInput = document.querySelector('#proof-file');
 const proofAnalyzeButton = document.querySelector('#analyze-proof');
 const proofOcrMessage = document.querySelector('#proof-ocr-message');
 const proofOcrToken = document.querySelector('#proof-ocr-token');
-let proofEntryMode = 'manual';
+let proofEntryMode = 'ocr';
 const proofFields = document.querySelector('[data-proof-fields]');
 const proofReview = document.querySelector('[data-proof-review]');
 const proofConfirm = document.querySelector('[data-proof-confirm]');
@@ -1354,9 +1397,9 @@ const resetProofForm = () => {
     if (senderName && !senderName.value) senderName.value = document.querySelector('meta[name="auth-user-name"]')?.content || '';
     const method = proofForm.querySelector('[data-proof-mode="ocr"]');
     method?.removeAttribute('disabled');
-    proofForm.querySelector('[data-proof-mode="manual"]')?.click();
+    proofForm.querySelector('[data-proof-mode="ocr"]')?.click();
     if (proofOcrToken) proofOcrToken.value = '';
-    if (proofFileHint) proofFileHint.textContent = 'Choose a file to attach. Switch to OCR mode to read its details automatically.';
+    if (proofFileHint) proofFileHint.textContent = 'Choose a PDF or image. OCR starts automatically after upload.';
     if (proofForm.querySelector('[name="return_to"]')) proofForm.querySelector('[name="return_to"]').value = proofForm.dataset.proofReturn || 'show';
 };
 const setProofFieldsVisible = (visible) => {
@@ -1450,6 +1493,15 @@ if (proofForm && proofInput && proofAnalyzeButton && proofOcrMessage && proofOcr
             return;
         }
 
+        const maxBytes = Number(proofInput.dataset.uploadMaxBytes || 52428800);
+        if (file.size > maxBytes) {
+            const maxMb = Math.round(maxBytes / (1024 * 1024));
+            proofOcrMessage.textContent = `File size exceeds the maximum upload limit of ${maxMb} MB. Please select a smaller file or compress it.`;
+            proofOcrMessage.classList.add('error');
+            setProofFieldsVisible(true);
+            return;
+        }
+
         if (/\.(mp4|mov|webm)$/i.test(file.name)) {
             proofOcrMessage.textContent = 'Video files do not support OCR. Enter the receiver and reference manually, review them, and confirm below.';
             setProofFieldsVisible(true);
@@ -1457,9 +1509,9 @@ if (proofForm && proofInput && proofAnalyzeButton && proofOcrMessage && proofOcr
         }
 
         proofAnalyzeButton.disabled = true;
-        proofAnalyzeButton.textContent = 'Analyzing proofâ€¦';
+        proofAnalyzeButton.textContent = 'Analyzing proof';
         proofOcrMessage.classList.remove('error');
-        proofOcrMessage.textContent = 'Extracting proof details for reviewâ€¦';
+        proofOcrMessage.textContent = 'Extracting proof details for review...';
 
         try {
             const data = new FormData();

@@ -792,7 +792,7 @@
         <main class="main">
             <header class="topbar">
                 <form class="top-search" method="get" action="{{ route('transmittals.index') }}">
-                    <span aria-hidden="true">Γîò</span>
+                    <i class="fas fa-search text-gray-400 text-sm" aria-hidden="true"></i>
                     <input
                         type="search"
                         name="q"

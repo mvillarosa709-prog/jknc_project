@@ -9,15 +9,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::table('transmittals')
-            ->where('status', 'draft')
-            ->update(['status' => 'pending_approval']);
+        if (Schema::hasTable('transmittals') && Schema::hasColumn('transmittals', 'status')) {
+            DB::table('transmittals')
+                ->where('status', 'draft')
+                ->update(['status' => 'pending_approval']);
+        }
 
-        Schema::table('transmittals', function (Blueprint $table) {
-            $table->foreignId('rejected_by')->nullable()->constrained('users')->restrictOnDelete();
-            $table->timestamp('rejected_at')->nullable();
-            $table->text('rejection_reason')->nullable();
-        });
+        if (Schema::hasTable('transmittals')) {
+            Schema::table('transmittals', function (Blueprint $table) {
+                if (!Schema::hasColumn('transmittals', 'rejected_by')) {
+                    $table->foreignId('rejected_by')->nullable()->constrained('users')->restrictOnDelete();
+                }
+                if (!Schema::hasColumn('transmittals', 'rejected_at')) {
+                    $table->timestamp('rejected_at')->nullable();
+                }
+                if (!Schema::hasColumn('transmittals', 'rejection_reason')) {
+                    $table->text('rejection_reason')->nullable();
+                }
+            });
+        }
     }
 
     public function down(): void

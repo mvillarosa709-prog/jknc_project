@@ -8,9 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('proof_of_transmissions', function (Blueprint $table): void {
-            $table->foreignId('recipient_id')->nullable()->change();
-        });
+        if (Schema::hasTable('proof_of_transmissions') && Schema::hasColumn('proof_of_transmissions', 'recipient_id')) {
+            Schema::table('proof_of_transmissions', function (Blueprint $table): void {
+                $table->foreignId('recipient_id')->nullable()->change();
+            });
+        }
     }
 
     public function down(): void

@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <title>Transmittal Form</title>
     <style>
-        @page { size: A4 portrait; margin: 18mm 16mm 22mm 16mm; }
+        @page { size: A4 portrait; margin: 1in; }
         * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; font-size: 11px; color: #111827; margin: 0; }
-        .page { width: 100%; min-height: 257mm; }
-        .corp-header { text-align: center; margin-bottom: 18mm; color: #000; }
-        .corp-logo { width: 155px; max-width: 155px; max-height: 100px; object-fit: contain; margin: 0 auto 6px auto; display: block; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111827; margin: 0; padding: 0; }
+        .page { width: 100%; min-height: 240mm; }
+        .corp-header { text-align: center; margin-top: 0; margin-bottom: 0.75in; color: #000; }
+        .corp-logo { width: 155px; max-width: 155px; max-height: 95px; object-fit: contain; margin: 0 auto 8px auto; display: block; }
         .corp-name { font-family: Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 700; text-transform: uppercase; line-height: 1.15; }
         .corp-reg, .corp-address { font-family: Georgia, 'Times New Roman', serif; font-size: 12px; font-weight: 700; line-height: 1.25; text-transform: uppercase; }
-        .title { text-align: center; font-size: 25px; font-weight: 800; margin-bottom: 18px; color: #0037a6; font-family: Georgia, 'Times New Roman', serif; }
+        .title { text-align: center; font-size: 25px; font-weight: 800; margin-top: 0.5in; margin-bottom: 0.5in; color: #0037a6; font-family: Georgia, 'Times New Roman', serif; }
         .top-row { display: table; width: 100%; margin-bottom: 6px; }
         .cell { display: table-cell; vertical-align: bottom; }
         .label { font-weight: 700; width: 70px; color: #0037a6; font-family: Georgia, 'Times New Roman', serif; font-size: 13px; }
@@ -41,7 +41,7 @@
     $companyName = $ctx['companyName'] ?? 'John Kelly & Company';
     $secRegNo = $ctx['secRegNo'] ?? '';
     $principalAddress = $ctx['principalAddress'] ?? '';
-    $logoSrc = $ctx['logoBase64'] ?? $ctx['logoUrl'] ?? asset('images/jknc_logo.png');
+    $logoSrc = $ctx['logoBase64'] ?? $ctx['logoUrl'] ?? asset('images/FINAL_LOGO.jpg');
     $approvedByName = $approvedByDisplay ?? $transmittal->approved_by_name;
     $footerLeft = ($transmittal->transmittal_no ?? 'TRANSMITTAL') . ' - ' . $companyName;
 @endphp
@@ -52,9 +52,7 @@
             <img src="{{ $logoSrc }}" class="corp-logo" alt="Company Logo">
         @endif
         <div class="corp-name">{{ $companyName }}</div>
-        @if($secRegNo !== '')
-            <div class="corp-reg">COMPANY REG. NO.: {{ $secRegNo }}</div>
-        @endif
+        <div class="corp-reg">CONTROL NO.: {{ $transmittal->transmittal_no ?? ($transmittal->tracking_number ?? 'AUTO-INCREMENT') }}</div>
         @if($principalAddress !== '')
             <div class="corp-address">{{ $principalAddress }}</div>
         @endif

@@ -149,41 +149,50 @@
     </style>
 </head>
 <body>
+    @php
+        $rawDeliveryType = strtolower((string) ($transmittal->delivery_type ?? 'by_person'));
+        $isElectronic = in_array($rawDeliveryType, ['electronic', 'email'], true) || filled($receipt->ip_address) || filled($receipt->user_agent);
+        $receiptTypeName = $isElectronic ? 'ELECTRONIC TRANSMISSION RECEIPT (ETR)' : 'PHYSICAL TRANSMITTAL RECEIPT (PTR)';
+        $receiptTypeSub = $isElectronic 
+            ? 'Digital acknowledgment recorded via Secure Recipient Portal' 
+            : 'Official physical handover receipt generated upon transmittal';
+    @endphp
+
     <div class="header">
         <table class="header-table">
             <tr>
                 <td class="header-left">
                     <div class="company-name">JOHN KELLY &amp; COMPANY</div>
-                    <div class="company-sub">Official Transmittal Receipt</div>
+                    <div class="company-sub">{{ $isElectronic ? 'Electronic Transmission Receipt' : 'Physical Transmittal Receipt' }}</div>
                 </td>
                 <td class="header-right">
-                    <div><span class="label">Receipt No:</span> {{ $receipt->receipt_no ?? 'N/A' }}</div>
+                    <div><span class="label">Receipt No:</span> {{ $receipt->receipt_no ?? ($receipt->receipt_code ?? 'N/A') }}</div>
                     <div><span class="label">Receipt Date:</span> {{ $receiptDate }}</div>
-                    <div><span class="label">Linked Ref No:</span> {{ $transmittal->transmittal_no ?? 'N/A' }}</div>
+                    <div><span class="label">Linked Ref No:</span> {{ $transmittal->tracking_number ?? ($transmittal->transmittal_no ?? 'N/A') }}</div>
                 </td>
             </tr>
         </table>
     </div>
 
-    <div class="receipt-title">TRANSMITTAL RECEIPT</div>
-    <div class="receipt-subtitle">Generated upon approved transmittal</div>
+    <div class="receipt-title" style="color: {{ $isElectronic ? '#15803d' : '#0f172a' }};">{{ $receiptTypeName }}</div>
+    <div class="receipt-subtitle">{{ $receiptTypeSub }}</div>
 
     <table class="top-info">
         <tr>
             <td>
                 <div class="info-box">
-                    <div class="info-line"><span class="label">Mode:</span> {{ $transmittal->mode ?? 'N/A' }}</div>
-                    <div class="info-line"><span class="label">Office:</span> {{ $transmittal->office_name ?? 'N/A' }}</div>
+                    <div class="info-line"><span class="label">Mode:</span> {{ strtoupper($transmittal->direction ?? ($transmittal->mode ?? 'SEND')) }}</div>
+                    <div class="info-line"><span class="label">Office:</span> {{ $transmittal->origin_office ?? ($transmittal->office_name ?? config('ordo.office_name')) }}</div>
                     <div class="info-line"><span class="label">From:</span> {{ $fromValue }}</div>
                     <div class="info-line"><span class="label">To:</span> {{ $toValue }}</div>
                 </div>
             </td>
             <td>
                 <div class="info-box">
-                    <div class="info-line"><span class="label">Delivery Type:</span> {{ $deliveryType }}</div>
-                    <div class="info-line"><span class="label">Recipient Email:</span> {{ $transmittal->recipient_email ?: '—' }}</div>
-                    <div class="info-line"><span class="label">Workflow:</span> {{ $transmittal->workflow_status ?? 'N/A' }}</div>
-                    <div class="info-line"><span class="label">Approval:</span> {{ $transmittal->approval_status ?? 'N/A' }}</div>
+                    <div class="info-line"><span class="label">Delivery Type:</span> <strong>{{ $isElectronic ? 'Electronic (Digital Portal)' : 'Physical Handover / Courier' }}</strong></div>
+                    <div class="info-line"><span class="label">Recipient Email:</span> {{ $receipt->recipient?->email ?: ($transmittal->recipient_email ?: ($transmittal->recipients->first()?->email ?: '—')) }}</div>
+                    <div class="info-line"><span class="label">Workflow:</span> {{ str($transmittal->status ?? ($transmittal->workflow_status ?? 'Accepted'))->replace('_', ' ')->title() }}</div>
+                    <div class="info-line"><span class="label">Approval:</span> {{ $transmittal->approved_at ? 'Approved' : ($transmittal->approval_status ?? 'Pending') }}</div>
                 </div>
             </td>
         </tr>
@@ -192,26 +201,37 @@
     <div class="section-title">RECEIPT DETAILS</div>
 
     <table class="details-table">
-        <tr><td class="label-col">Address</td><td>{{ $transmittal->address ?? 'N/A' }}</td></tr>
+        <tr><td class="label-col">Address</td><td>{{ $transmittal->recipient_address ?? ($transmittal->address ?? 'N/A') }}</td></tr>
         <tr><td class="label-col">Actions</td><td>{{ $actions }}</td></tr>
-        <tr><td class="label-col">Prepared By</td><td>{{ $transmittal->prepared_by_name ?? 'N/A' }}</td></tr>
+        <tr><td class="label-col">Prepared By</td><td>{{ $transmittal->prepared_by_name ?? ($transmittal->preparer?->name ?? 'N/A') }}</td></tr>
         <tr><td class="label-col">Approved By</td><td>{{ $approvedByText }}</td></tr>
         <tr><td class="label-col">Delivered By</td><td>{{ $transmittal->delivered_by ?? 'N/A' }}</td></tr>
-        <tr><td class="label-col">Received By</td><td>{{ $transmittal->received_by ?? 'N/A' }}</td></tr>
-        <tr><td class="label-col">Affiliated to / Company</td><td>{{ $transmittal->receiver_affiliation ?? 'N/A' }}</td></tr>
+        <tr><td class="label-col">Received By</td><td>{{ $receipt->signed_name ?? ($receipt->received_by ?? ($transmittal->received_by ?? 'N/A')) }}</td></tr>
+        <tr><td class="label-col">Affiliated to / Company</td><td>{{ $transmittal->processing_company ?? ($transmittal->receiver_affiliation ?? 'N/A') }}</td></tr>
         <tr><td class="label-col">Date and Time Received</td><td>{{ $receivedAt }}</td></tr>
+        @if ($isElectronic)
+            <tr>
+                <td class="label-col">Digital Audit Trail</td>
+                <td>
+                    Digitally signed and confirmed via Secure Recipient Portal
+                    @if(!empty($receipt->snapshot['location']) && !str_contains(strtolower($receipt->snapshot['location']), '127.0.0.1'))
+                        &nbsp;|&nbsp; Location: {{ $receipt->snapshot['location'] }}
+                    @endif
+                </td>
+            </tr>
+        @endif
     </table>
 
     <table class="signatures">
         <tr>
             <td>
                 <div class="sign-label">Prepared by:</div>
-                <div class="sign-line">{{ $transmittal->prepared_by_name ?? ' ' }}</div>
+                <div class="sign-line">{{ $transmittal->prepared_by_name ?? ($transmittal->preparer?->name ?? ' ') }}</div>
                 <div class="sign-datetime">{{ $preparedAt }}</div>
             </td>
             <td>
                 <div class="sign-label">Approved by:</div>
-                <div class="sign-line">{{ $transmittal->approved_by_name ?? ' ' }}</div>
+                <div class="sign-line">{{ $transmittal->approver?->name ?? ($transmittal->approved_by_name ?? ' ') }}</div>
                 <div class="sign-datetime">{{ $approvedAt }}</div>
             </td>
             <td>
@@ -220,14 +240,14 @@
             </td>
             <td>
                 <div class="sign-label">Received by:</div>
-                <div class="sign-line">{{ $transmittal->received_by ?? ' ' }}</div>
-                <div class="sign-datetime">{{ $transmittal->receiver_affiliation ?? ' ' }}</div>
+                <div class="sign-line">{{ $receipt->signed_name ?? ($receipt->received_by ?? ($transmittal->received_by ?? ' ')) }}</div>
+                <div class="sign-datetime">{{ $transmittal->processing_company ?? ($transmittal->receiver_affiliation ?? ' ') }}</div>
             </td>
         </tr>
     </table>
 
     <div class="footer">
-        This document is system-generated by John Kelly &amp; Company CRM. Linked Transmittal: {{ $transmittal->transmittal_no ?? 'N/A' }}.
+        This document is system-generated by John Kelly &amp; Company CRM. Linked Transmittal: {{ $transmittal->tracking_number ?? ($transmittal->transmittal_no ?? 'N/A') }}.
     </div>
 </body>
 </html>

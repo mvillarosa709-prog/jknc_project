@@ -121,13 +121,16 @@
         <div class="px-5 pt-5">
             <form method="GET" action="{{ route('admin.finance.dashboard') }}" class="bg-gray-50 border border-gray-200 rounded-xl p-4 grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-3">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <input
-                        type="text"
-                        name="search"
-                        value="{{ $filters['search'] }}"
-                        placeholder="Search number, title, requester..."
-                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
-                    >
+                    <div class="relative w-full">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                        <input
+                            type="text"
+                            name="search"
+                            value="{{ $filters['search'] }}"
+                            placeholder="Search"
+                            class="w-full bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-full pl-11 pr-4 py-2 text-sm text-gray-800 placeholder-gray-400 outline-none transition"
+                        >
+                    </div>
                     <select name="module" class="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500">
                         <option value="all">All Finance Sections</option>
                         @foreach($moduleLabels as $moduleKey => $moduleLabel)

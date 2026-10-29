@@ -100,14 +100,14 @@
         <div class="px-5 pt-5">
             <form method="GET" action="{{ $dashboardRoute }}" class="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col xl:flex-row xl:items-center gap-3 xl:justify-between">
                 <div class="flex flex-col md:flex-row gap-3 w-full xl:w-auto">
-                    <div class="relative">
-                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <div class="relative w-full md:w-80">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
                         <input
                             type="text"
                             name="search"
                             value="{{ $filters['search'] }}"
-                            placeholder="Search ref, module, file, department, uploader..."
-                            class="w-full md:w-80 border border-gray-300 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
+                            placeholder="Search"
+                            class="w-full bg-white border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-full pl-11 pr-4 py-2 text-sm text-gray-800 placeholder-gray-400 outline-none transition"
                         >
                     </div>
 

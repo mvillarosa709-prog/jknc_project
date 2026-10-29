@@ -37,13 +37,25 @@ return new class extends Migration
          * This keeps historical records consistent before the
          * channel field is enforced for future provider messages.
          */
-        DB::statement(
-            'UPDATE message_entries me
-             INNER JOIN message_conversations mc
-                ON mc.id = me.message_conversation_id
-             SET me.channel = mc.channel
-             WHERE me.channel IS NULL'
-        );
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(
+                'UPDATE message_entries
+                 SET channel = (
+                     SELECT mc.channel
+                     FROM message_conversations mc
+                     WHERE mc.id = message_entries.message_conversation_id
+                 )
+                 WHERE channel IS NULL'
+            );
+        } else {
+            DB::statement(
+                'UPDATE message_entries me
+                 INNER JOIN message_conversations mc
+                    ON mc.id = me.message_conversation_id
+                 SET me.channel = mc.channel
+                 WHERE me.channel IS NULL'
+            );
+        }
 
         /*
          * external_message_id may overlap between different providers,

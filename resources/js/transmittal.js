@@ -1,23 +1,98 @@
 const tabs = document.querySelectorAll('[data-tab]');
+const actionPanel = document.querySelector('[data-action-panel]');
+const reopenActionPanel = document.querySelector('[data-reopen-action-panel]');
+
+document.querySelectorAll('[data-close-action-panel]').forEach((button) => button.addEventListener('click', () => {
+    if (!actionPanel) return;
+    actionPanel.dataset.dismissed = 'true';
+    actionPanel.hidden = true;
+    if (reopenActionPanel) reopenActionPanel.hidden = false;
+    actionPanel.closest('.workspace-tab-layout')?.classList.remove('has-action-center');
+}));
+
+reopenActionPanel?.addEventListener('click', () => {
+    if (!actionPanel) return;
+    actionPanel.dataset.dismissed = 'false';
+    actionPanel.hidden = false;
+    reopenActionPanel.hidden = true;
+    actionPanel.closest('.workspace-tab-layout')?.classList.add('has-action-center');
+});
+
+const updateActionPanelOptions = (activeTab) => {
+    if (!actionPanel) return;
+    const actionElements = actionPanel.querySelectorAll('[data-action-tab]');
+    actionElements.forEach((el) => {
+        const allowedTabs = (el.dataset.actionTab || '').split(',').map((t) => t.trim());
+        const isMatch = allowedTabs.includes(activeTab);
+        el.hidden = !isMatch;
+    });
+};
+
 tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
         tabs.forEach((item) => item.classList.toggle('active', item === tab));
         document.querySelectorAll('.tab-content').forEach((panel) => {
             panel.classList.toggle('active', panel.id === `tab-${tab.dataset.tab}`);
         });
-        const actionCenterVisible = ['transmittal', 'receipt', 'proof'].includes(tab.dataset.tab);
-        document.querySelectorAll('[data-action-panel]').forEach((panel) => {
-            panel.hidden = !actionCenterVisible;
-        });
+        const currentTab = tab.dataset.tab;
+        const actionCenterVisible = ['transmittal', 'receipt', 'proof'].includes(currentTab);
+        const dismissed = actionPanel?.dataset.dismissed === 'true';
+        if (actionPanel) actionPanel.hidden = !actionCenterVisible || dismissed;
+        if (reopenActionPanel) reopenActionPanel.hidden = !actionCenterVisible || !dismissed;
         document.querySelectorAll('.workspace-tab-layout').forEach((layout) => {
-            layout.classList.toggle('has-action-center', actionCenterVisible);
+            layout.classList.toggle('has-action-center', actionCenterVisible && !dismissed);
+        });
+        if (actionCenterVisible) {
+            updateActionPanelOptions(currentTab);
+        }
+    });
+});
+
+// Initialize on load with the currently active tab
+const initialActiveTab = document.querySelector('[data-tab].active')?.dataset.tab || 'draft';
+if (['transmittal', 'receipt', 'proof'].includes(initialActiveTab)) {
+    updateActionPanelOptions(initialActiveTab);
+}
+
+// "Open receipt view" action button switches to receipt tab
+document.querySelectorAll('[data-open-receipt-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        document.querySelector('[data-tab="receipt"]')?.click();
+    });
+});
+
+// Attachment browser item selection
+document.querySelectorAll('[data-attachment-browser]').forEach((browser) => {
+    const frame = browser.querySelector('[data-attachment-frame]');
+    const title = browser.querySelector('[data-attachment-preview-title]');
+    const category = browser.querySelector('[data-attachment-preview-category]');
+    const unavailable = browser.querySelector('[data-attachment-unavailable]');
+    const downloadLink = browser.querySelector('.attachment-preview-actions a');
+
+    browser.querySelectorAll('[data-attachment-select]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const name = button.dataset.attachmentName || 'Attachment';
+            const previewable = button.dataset.attachmentPreviewable === 'true';
+            browser.querySelectorAll('[data-attachment-select]').forEach((item) => {
+                item.setAttribute('aria-pressed', item === button ? 'true' : 'false');
+            });
+            if (title) title.textContent = name;
+            if (category) category.textContent = button.dataset.attachmentCategory || '';
+            if (frame) {
+                frame.title = name;
+                frame.hidden = !previewable;
+                frame.src = previewable ? (button.dataset.attachmentFitUrl || button.dataset.attachmentUrl) : '';
+            }
+            if (downloadLink) downloadLink.href = button.dataset.attachmentUrl || '#';
+            if (unavailable) unavailable.hidden = previewable;
         });
     });
 });
 
+const proofUploadModal = document.querySelector('[data-proof-modal]');
+
 document.querySelectorAll('[data-open-proof-action]').forEach((button) => {
     button.addEventListener('click', () => {
-        const actionPanel = document.querySelector('[data-action-panel]');
         const proofTab = document.querySelector('[data-tab="proof"]');
 
         if (proofTab && !proofTab.classList.contains('active')) {
@@ -25,11 +100,13 @@ document.querySelectorAll('[data-open-proof-action]').forEach((button) => {
         }
 
         if (actionPanel) {
+            actionPanel.dataset.dismissed = 'false';
             actionPanel.hidden = false;
+            if (reopenActionPanel) reopenActionPanel.hidden = true;
             actionPanel.closest('.workspace-tab-layout')?.classList.add('has-action-center');
         }
 
-        const modal = actionPanel?.querySelector('[data-proof-modal]');
+        const modal = proofUploadModal || document.querySelector('[data-proof-modal]');
         if (modal) {
             resetProofForm();
             modal.hidden = false;
@@ -48,17 +125,17 @@ document.querySelectorAll('[data-open-proof-action]').forEach((button) => {
         }
     });
 });
+
 document.querySelectorAll('[data-toggle-proof-form]').forEach((button) => {
     button.addEventListener('click', () => {
-        const panel = button.closest('[data-action-panel]');
-        const modal = panel?.querySelector('[data-proof-modal]');
+        const modal = proofUploadModal || document.querySelector('[data-proof-modal]');
         if (modal) {
             resetProofForm();
             modal.hidden = false;
             document.body.classList.add('proof-modal-open');
             modal.querySelector('input:not([type="hidden"]), select')?.focus({ preventScroll: true });
         } else if (button.dataset.actionFeedback) {
-            const feedback = panel?.querySelector('[data-action-feedback-message]');
+            const feedback = actionPanel?.querySelector('[data-action-feedback-message]');
             if (feedback) {
                 feedback.textContent = button.dataset.actionFeedback;
                 feedback.hidden = false;
@@ -66,9 +143,10 @@ document.querySelectorAll('[data-toggle-proof-form]').forEach((button) => {
         }
     });
 });
+
 document.querySelectorAll('[data-close-proof-modal]').forEach((button) => {
     button.addEventListener('click', () => {
-        const modal = button.closest('[data-proof-modal]');
+        const modal = button.closest('[data-proof-modal]') || proofUploadModal || document.querySelector('[data-proof-modal]');
         if (modal) modal.hidden = true;
         resetProofForm();
         document.body.classList.remove('proof-modal-open');
@@ -109,11 +187,57 @@ const stopCamera = () => {
     document.body.classList.remove('proof-modal-open');
 };
 
+let cameraFacingMode = 'environment';
+
+const startCameraStream = async () => {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach((track) => track.stop());
+        cameraStream = null;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+        if (cameraMessage) {
+            cameraMessage.textContent = 'Live camera stream is not supported by your browser or connection. Choose a photo/video file instead.';
+        }
+        return false;
+    }
+
+    try {
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: cameraFacingMode } },
+                audio: true
+            });
+        } catch {
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: cameraFacingMode } },
+                audio: false
+            });
+        }
+        if (cameraPreview) {
+            cameraPreview.srcObject = cameraStream;
+            await cameraPreview.play();
+        }
+        if (cameraPhotoButton) cameraPhotoButton.disabled = false;
+        if (cameraRecordButton) cameraRecordButton.disabled = !window.MediaRecorder;
+        if (cameraMessage) cameraMessage.textContent = 'Capture a photo or record a video, then use it as the proof file.';
+        return true;
+    } catch (error) {
+        console.warn('getUserMedia error:', error);
+        if (cameraMessage) {
+            cameraMessage.textContent = error.name === 'NotAllowedError'
+                ? 'Camera permission was denied. Allow camera access in your browser or choose a file instead.'
+                : 'Could not access the camera. Tap "Choose file instead" to capture using your device camera or gallery.';
+        }
+        return false;
+    }
+};
+
 document.querySelectorAll('[data-open-proof-file]').forEach((button) => {
     button.addEventListener('click', async () => {
-        const panel = button.closest('[data-action-panel]');
-        const form = panel?.querySelector('#proof-upload-form');
-        if (!form || !cameraModal || !cameraPreview) {
+        const panel = button.closest('[data-action-panel]') || document.querySelector('[data-action-panel]');
+        const form = panel?.querySelector('#proof-upload-form') || document.querySelector('#proof-upload-form');
+        
+        if (!cameraModal || !cameraPreview) {
             const feedback = panel?.querySelector('[data-action-feedback-message]');
             if (feedback && button.dataset.actionFeedback) {
                 feedback.textContent = button.dataset.actionFeedback;
@@ -125,33 +249,19 @@ document.querySelectorAll('[data-open-proof-file]').forEach((button) => {
         cameraModal.hidden = false;
         document.body.classList.add('proof-modal-open');
         cameraFile = null;
-        cameraUseButton.disabled = true;
-        cameraPhotoButton.disabled = true;
-        cameraRecordButton.disabled = true;
-        cameraMessage.textContent = 'Requesting camera accessΓÇª';
+        if (cameraUseButton) cameraUseButton.disabled = true;
+        if (cameraPhotoButton) cameraPhotoButton.disabled = true;
+        if (cameraRecordButton) cameraRecordButton.disabled = true;
+        if (cameraMessage) cameraMessage.textContent = 'Requesting camera access…';
 
-        if (!navigator.mediaDevices?.getUserMedia) {
-            cameraMessage.textContent = 'Camera access is not available in this browser. Choose a photo or video file instead.';
-            return;
-        }
-
-        try {
-            try {
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: true });
-            } catch {
-                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-            }
-            cameraPreview.srcObject = cameraStream;
-            await cameraPreview.play();
-            cameraPhotoButton.disabled = false;
-            cameraRecordButton.disabled = !window.MediaRecorder;
-            cameraMessage.textContent = 'Capture a photo or record a video, then use it as the proof file.';
-        } catch (error) {
-            cameraMessage.textContent = error.name === 'NotAllowedError'
-                ? 'Camera permission was denied. Allow camera access in your browser or choose a file instead.'
-                : 'Could not start the camera. Choose a photo or video file instead.';
-        }
+        await startCameraStream();
     });
+});
+
+document.querySelector('[data-camera-switch]')?.addEventListener('click', async () => {
+    cameraFacingMode = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    if (cameraMessage) cameraMessage.textContent = 'Switching camera…';
+    await startCameraStream();
 });
 
 cameraPhotoButton?.addEventListener('click', () => {
@@ -161,12 +271,12 @@ cameraPhotoButton?.addEventListener('click', () => {
     cameraCanvas.getContext('2d')?.drawImage(cameraPreview, 0, 0);
     cameraCanvas.toBlob((blob) => {
         if (!blob) {
-            cameraMessage.textContent = 'Could not capture the photo. Please try again.';
+            if (cameraMessage) cameraMessage.textContent = 'Could not capture the photo. Please try again.';
             return;
         }
         cameraFile = new File([blob], `transmission-proof-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        cameraUseButton.disabled = false;
-        cameraMessage.textContent = 'Photo captured. Select ΓÇ£Use captured fileΓÇ¥ to attach it to the proof record.';
+        if (cameraUseButton) cameraUseButton.disabled = false;
+        if (cameraMessage) cameraMessage.textContent = 'Photo captured! Select "Use captured file" to attach it to the proof record.';
     }, 'image/jpeg', 0.92);
 });
 
@@ -180,18 +290,18 @@ cameraRecordButton?.addEventListener('click', () => {
             const type = cameraRecorder?.mimeType || 'video/webm';
             const extension = type.includes('mp4') ? 'mp4' : 'webm';
             cameraFile = new File([new Blob(cameraChunks, { type })], `transmission-proof-${Date.now()}.${extension}`, { type });
-            cameraUseButton.disabled = false;
-            cameraRecordButton.hidden = false;
-            cameraStopButton.hidden = true;
-            cameraMessage.textContent = 'Video recorded. Select ΓÇ£Use captured fileΓÇ¥ to attach it to the proof record.';
+            if (cameraUseButton) cameraUseButton.disabled = false;
+            if (cameraRecordButton) cameraRecordButton.hidden = false;
+            if (cameraStopButton) cameraStopButton.hidden = true;
+            if (cameraMessage) cameraMessage.textContent = 'Video recorded! Select "Use captured file" to attach it to the proof record.';
         });
         cameraRecorder.start();
         cameraRecordButton.hidden = true;
-        cameraStopButton.hidden = false;
-        cameraUseButton.disabled = true;
-        cameraMessage.textContent = 'Recording videoΓÇª select Stop recording when finished.';
+        if (cameraStopButton) cameraStopButton.hidden = false;
+        if (cameraUseButton) cameraUseButton.disabled = true;
+        if (cameraMessage) cameraMessage.textContent = 'Recording video… select Stop recording when finished.';
     } catch {
-        cameraMessage.textContent = 'Video recording is not supported by this camera/browser. You can still capture a photo or choose a video file.';
+        if (cameraMessage) cameraMessage.textContent = 'Video recording is not supported by this camera/browser. You can still capture a photo or choose a video file.';
     }
 });
 
@@ -200,19 +310,34 @@ cameraStopButton?.addEventListener('click', () => {
 });
 
 document.querySelectorAll('[data-close-camera]').forEach((button) => button.addEventListener('click', stopCamera));
+
 document.querySelector('[data-camera-browse]')?.addEventListener('click', () => {
-    const panel = cameraModal?.closest('[data-action-panel]');
-    stopCamera();
-    panel?.querySelector('#proof-file')?.click();
+    const nativeFallback = document.querySelector('#camera-native-fallback');
+    if (nativeFallback) {
+        nativeFallback.click();
+    } else {
+        const fileInput = document.querySelector('#proof-file');
+        stopCamera();
+        fileInput?.click();
+    }
 });
 
-cameraUseButton?.addEventListener('click', () => {
-    if (!cameraFile || !proofInput) return;
+document.querySelector('#camera-native-fallback')?.addEventListener('change', (e) => {
+    const file = e.target?.files?.[0];
+    if (file) {
+        cameraFile = file;
+        attachCameraFileToProofForm();
+    }
+});
+
+const attachCameraFileToProofForm = () => {
+    const fileInput = document.querySelector('#proof-file');
+    if (!cameraFile || !fileInput) return;
     const transfer = new DataTransfer();
     transfer.items.add(cameraFile);
-    proofInput.files = transfer.files;
-    proofInput.dispatchEvent(new Event('change', { bubbles: true }));
-    const form = proofInput.closest('#proof-upload-form');
+    fileInput.files = transfer.files;
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    const form = fileInput.closest('#proof-upload-form');
     const proofModal = form?.closest('[data-proof-modal]');
     stopCamera();
     if (proofModal) {
@@ -222,6 +347,10 @@ cameraUseButton?.addEventListener('click', () => {
         const feedback = proofModal.querySelector('[data-proof-file-hint]');
         if (feedback) feedback.textContent = `${cameraFile.name} is attached. Complete the fields and select Save proof record to add it to the table.`;
     }
+};
+
+cameraUseButton?.addEventListener('click', () => {
+    attachCameraFileToProofForm();
 });
 document.querySelectorAll('[data-open-recipient-fields]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -302,13 +431,38 @@ const directionInput = document.querySelector('select[name="direction"]');
 if (directionInput) {
     const counterpartyLabel = document.querySelector('[data-counterparty-label]');
     const officeLabel = document.querySelector('[data-office-label]');
+    const modeDesc = document.querySelector('[data-mode-description]');
+    const recipientInput = document.querySelector('input[name="recipients[0][name]"]');
+    const officeInput = document.querySelector('input[name="origin_office"]');
     const syncDirectionLabels = () => {
         const receiving = directionInput.value === 'receive';
         if (counterpartyLabel) counterpartyLabel.textContent = receiving ? 'From' : 'To';
         if (officeLabel) officeLabel.textContent = receiving ? 'To (Office)' : 'From (Office)';
+        if (modeDesc) modeDesc.textContent = receiving ? 'Incoming transmittal' : 'Outgoing transmittal';
+        if (recipientInput) recipientInput.placeholder = receiving ? 'Enter external sender / source' : 'Enter external receiver / destination';
+        if (officeInput) officeInput.placeholder = receiving ? 'Enter office receiving the transmittal' : 'Enter office sending the transmittal';
     };
     directionInput.addEventListener('change', syncDirectionLabels);
     syncDirectionLabels();
+}
+
+const drawerDeliveryTypeSelect = document.querySelector('#drawer-delivery-type');
+if (drawerDeliveryTypeSelect) {
+    const byPersonBlock = document.querySelector('#drawer-by-person-block');
+    const registeredMailBlock = document.querySelector('#drawer-registered-mail-block');
+    const electronicBlock = document.querySelector('#drawer-electronic-block');
+    const recipientEmailBlock = document.querySelector('#drawer-recipient-email-block');
+
+    const syncDrawerDeliveryFields = () => {
+        const val = drawerDeliveryTypeSelect.value;
+        if (byPersonBlock) byPersonBlock.style.display = val === 'by_person' ? '' : 'none';
+        if (registeredMailBlock) registeredMailBlock.style.display = val === 'registered_mail' ? '' : 'none';
+        if (electronicBlock) electronicBlock.style.display = val === 'electronic' ? '' : 'none';
+        if (recipientEmailBlock) recipientEmailBlock.style.display = val === 'electronic' ? '' : 'none';
+    };
+
+    drawerDeliveryTypeSelect.addEventListener('change', syncDrawerDeliveryFields);
+    syncDrawerDeliveryFields();
 }
 
 const recipientList = document.querySelector('#recipient-list');
@@ -399,7 +553,7 @@ const syncWorkspacePreview = () => {
         }
         if (key === 'prepared-at' && value) value = new Date(value).toLocaleString();
         document.querySelectorAll(`[data-preview-output="${key}"]`).forEach((output) => {
-            output.textContent = value || (key === 'subject' ? 'Transmittal subject' : '├óΓé¼ΓÇ¥');
+            output.textContent = value || (key === 'subject' ? '' : '');
         });
         if (key === 'direction') {
             document.querySelectorAll('[data-preview-party="counterparty"]').forEach((output) => {
@@ -412,10 +566,10 @@ const syncWorkspacePreview = () => {
     });
 
     const direction = document.querySelector('select[name="direction"]')?.value || 'send';
-    const office = document.querySelector('input[name="origin_office"]')?.value.trim() || '├óΓé¼ΓÇ¥';
+    const office = document.querySelector('input[name="origin_office"]')?.value.trim() || '';
     const recipient = document.querySelector('input[name="recipients[0][name]"]')?.value.trim()
         || document.querySelector('input[name="related_company"]')?.value.trim()
-        || '├óΓé¼ΓÇ¥';
+        || '';
     document.querySelectorAll('[data-preview-output="from"]').forEach((output) => {
         output.textContent = direction === 'receive' ? recipient : office;
     });
@@ -427,7 +581,7 @@ const syncWorkspacePreview = () => {
         .map((input) => input.parentElement.textContent.trim())
         .join(', ');
     document.querySelectorAll('[data-preview-output="delivery-actions"]').forEach((output) => {
-        output.textContent = deliveryActions || '├óΓé¼ΓÇ¥';
+        output.textContent = deliveryActions || '';
     });
 
     const preparedAt = document.querySelector('input[name="prepared_at"]');
@@ -436,17 +590,30 @@ const syncWorkspacePreview = () => {
         preparedAtOutput.textContent = preparedAt.value.replace('T', ' ');
     }
 
-    const itemRows = [...(itemList?.querySelectorAll('.item-editor-row') || [])]
+    const itemRows = [...(itemList?.querySelectorAll('.item-editor-row, .item-row') || [])]
         .map((row) => {
             const item = [...row.querySelectorAll('input:not([type="hidden"]):not([type="file"]), textarea')]
                 .reduce((values, field) => {
-                const key = field.name.match(/\[([^\]]+)]$/)?.[1];
+                    const key = field.name.match(/\[([^\]]+)]$/)?.[1];
                     if (key) values[key] = field.value.trim();
                     return values;
                 }, {});
-            item.attachment = row.querySelector('input[type="file"]')?.files?.[0]?.name
-                || row.querySelector('.item-file-existing a')?.textContent.trim()
-                || '';
+            
+            const fileInput = row.querySelector('input[type="file"]');
+            const chosenSpan = row.querySelector('.chosen-file-name');
+            const strongDisplay = row.querySelector('strong');
+            
+            let attachmentName = '';
+            if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                attachmentName = Array.from(fileInput.files).map(f => f.name).join(', ');
+            } else if (strongDisplay && strongDisplay.textContent) {
+                attachmentName = strongDisplay.textContent.trim();
+            } else if (chosenSpan && chosenSpan.textContent && chosenSpan.textContent.trim() !== 'No file chosen') {
+                attachmentName = chosenSpan.textContent.trim();
+            } else {
+                attachmentName = row.querySelector('.item-file-existing a')?.textContent.trim() || '';
+            }
+            item.attachment = attachmentName;
             return item;
         })
         .filter((item) => Object.values(item).some(Boolean));
@@ -463,9 +630,9 @@ const syncWorkspacePreview = () => {
         } else {
             itemRows.forEach((item) => {
                 const row = document.createElement('tr');
-                [item.particular, item.unique_id, item.quantity, [item.description, item.remarks].filter(Boolean).join(' ├é┬╖ ')].forEach((value) => {
+                [item.particular, item.unique_id, item.quantity, [item.description, item.remarks].filter(Boolean).join(' · ')].forEach((value) => {
                     const cell = document.createElement('td');
-                    cell.textContent = value || '├óΓé¼ΓÇ¥';
+                    cell.textContent = value || '';
                     row.append(cell);
                 });
                 previewItems.append(row);
@@ -473,22 +640,25 @@ const syncWorkspacePreview = () => {
         }
     }
     const formPreviewItems = document.querySelector('[data-preview-form-items]');
-    if (formPreviewItems) {
+    const hasItemForm = Boolean(document.querySelector('#item-list, .item-editor-row, .item-row'));
+    if (formPreviewItems && hasItemForm) {
         formPreviewItems.replaceChildren();
         if (itemRows.length === 0) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
             cell.colSpan = 7;
-            cell.textContent = 'Items will appear here as they are added.';
+            cell.style.cssText = 'border: 1px solid #9ca3af; padding: 5px 6px; vertical-align: top; text-align: left; min-height: 26px; word-break: break-word;';
+            cell.textContent = '';
             row.append(cell);
             formPreviewItems.append(row);
         } else {
             itemRows.forEach((item, index) => {
                 const row = document.createElement('tr');
-                [String(index + 1), item.particular, item.unique_id, item.quantity, item.description, item.remarks, item.attachment]
+                [String(index + 1), item.particular, item.unique_id, item.quantity, item.description, item.remarks, item.attachment || '—']
                     .forEach((value) => {
                         const cell = document.createElement('td');
-                        cell.textContent = value || '├óΓé¼ΓÇ¥';
+                        cell.style.cssText = 'border: 1px solid #9ca3af; padding: 5px 6px; vertical-align: top; text-align: left; min-height: 26px; word-break: break-word;';
+                        cell.textContent = value || '';
                         row.append(cell);
                     });
                 formPreviewItems.append(row);
@@ -629,7 +799,7 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
                 return uploadResumable(file, true);
             }
             if (!response.ok) throw new Error(result.message || `Upload chunk ${index + 1} failed.`);
-            if (ocrMessage) ocrMessage.textContent = `Uploading ${file.name}: ${index + 1} of ${chunkCount} chunks├óΓé¼┬ª`;
+            if (ocrMessage) ocrMessage.textContent = `Uploading ${file.name}: ${index + 1} of ${chunkCount} chunks...`;
         }
         const completeResponse = await fetch(completeUrl, {
             method: 'POST',
@@ -664,13 +834,13 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
                 .filter(([, value]) => value)
                 .map(([field, value]) => {
                     const metadata = selectedFiles[index].analysisMetadata?.[field] || {};
-                    const confidence = metadata.confidence ? ` ├é┬╖ ${metadata.confidence} confidence` : '';
-                    const source = metadata.source ? ` ├é┬╖ ${metadata.source}` : '';
+                    const confidence = metadata.confidence ? ` · ${metadata.confidence} confidence` : '';
+                    const source = metadata.source ? ` · ${metadata.source}` : '';
                     return `${field.replaceAll('_', ' ')}: ${value}${confidence}${source}`;
                 });
             if (detected.length) {
                 const suggestions = document.createElement('small');
-                suggestions.textContent = `OCR suggestions ├óΓé¼ΓÇ¥ ${detected.join(' ├é┬╖ ')}`;
+                suggestions.textContent = `OCR suggestions: ${detected.join(' · ')}`;
                 copy.append(suggestions);
             }
 
@@ -738,9 +908,9 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
 
     analyzeButton.addEventListener('click', async () => {
         analyzeButton.disabled = true;
-        analyzeButton.textContent = 'Analyzing├óΓé¼┬ª';
+        analyzeButton.textContent = 'Analyzing...';
         ocrMessage.classList.remove('error');
-        ocrMessage.textContent = 'Reading files and extracting document details├óΓé¼┬ª';
+        ocrMessage.textContent = 'Reading files and extracting document details...';
         const ocrFiles = selectedFiles.filter((file) => /\.(pdf|jpe?g|png|tiff?)$/i.test(file.name));
         if (ocrFiles.length === 0) {
             ocrMessage.textContent = 'OCR classification is available for PDF and image files. Other formats can still be attached and categorized manually.';
@@ -811,7 +981,7 @@ if (documentInput && fileList && analyzeButton && !document.querySelector('.smar
             ocrMessage.classList.add('error');
             ocrMessage.textContent = error.message;
         } finally {
-            analyzeButton.textContent = '├ó┼ô┬º Classify & extract';
+            analyzeButton.textContent = 'Classify & extract';
             analyzeButton.disabled = selectedFiles.length === 0;
         }
     });
@@ -863,7 +1033,7 @@ const proofInput = document.querySelector('#proof-file');
 const proofAnalyzeButton = document.querySelector('#analyze-proof');
 const proofOcrMessage = document.querySelector('#proof-ocr-message');
 const proofOcrToken = document.querySelector('#proof-ocr-token');
-let proofEntryMode = 'manual';
+let proofEntryMode = 'ocr';
 const proofFields = document.querySelector('[data-proof-fields]');
 const proofReview = document.querySelector('[data-proof-review]');
 const proofConfirm = document.querySelector('[data-proof-confirm]');
@@ -889,9 +1059,9 @@ const resetProofForm = () => {
     if (senderName && !senderName.value) senderName.value = document.querySelector('meta[name="auth-user-name"]')?.content || '';
     const method = proofForm.querySelector('[data-proof-mode="ocr"]');
     method?.removeAttribute('disabled');
-    proofForm.querySelector('[data-proof-mode="manual"]')?.click();
+    proofForm.querySelector('[data-proof-mode="ocr"]')?.click();
     if (proofOcrToken) proofOcrToken.value = '';
-    if (proofFileHint) proofFileHint.textContent = 'Choose a file to attach. Switch to OCR mode to read its details automatically.';
+    if (proofFileHint) proofFileHint.textContent = 'Choose a PDF or image. OCR starts automatically after upload.';
     if (proofForm.querySelector('[name="return_to"]')) proofForm.querySelector('[name="return_to"]').value = proofForm.dataset.proofReturn || 'show';
 };
 const setProofFieldsVisible = (visible) => {
@@ -985,6 +1155,15 @@ if (proofForm && proofInput && proofAnalyzeButton && proofOcrMessage && proofOcr
             return;
         }
 
+        const maxBytes = Number(proofInput.dataset.uploadMaxBytes || 52428800);
+        if (file.size > maxBytes) {
+            const maxMb = Math.round(maxBytes / (1024 * 1024));
+            proofOcrMessage.textContent = `File size exceeds the maximum upload limit of ${maxMb} MB. Please select a smaller file or compress it.`;
+            proofOcrMessage.classList.add('error');
+            setProofFieldsVisible(true);
+            return;
+        }
+
         if (/\.(mp4|mov|webm)$/i.test(file.name)) {
             proofOcrMessage.textContent = 'Video files do not support OCR. Enter the receiver and reference manually, review them, and confirm below.';
             setProofFieldsVisible(true);
@@ -992,9 +1171,9 @@ if (proofForm && proofInput && proofAnalyzeButton && proofOcrMessage && proofOcr
         }
 
         proofAnalyzeButton.disabled = true;
-        proofAnalyzeButton.textContent = 'Analyzing proof├óΓé¼┬ª';
+        proofAnalyzeButton.textContent = 'Analyzing proof';
         proofOcrMessage.classList.remove('error');
-        proofOcrMessage.textContent = 'Extracting proof details for review├óΓé¼┬ª';
+        proofOcrMessage.textContent = 'Extracting proof details for review...';
 
         try {
             const data = new FormData();
@@ -1096,3 +1275,27 @@ if (proofForm && proofInput && proofAnalyzeButton && proofOcrMessage && proofOcr
         }
     });
 }
+
+function initOtherOptionToggle(selectId, wrapperId, inputId) {
+    const select = document.getElementById(selectId);
+    const wrapper = document.getElementById(wrapperId);
+    const input = document.getElementById(inputId);
+    if (!select || !wrapper || !input) return;
+
+    const toggle = () => {
+        const isOther = select.value === 'other';
+        wrapper.hidden = !isOther;
+        input.required = isOther;
+        if (!isOther) {
+            input.value = '';
+        }
+    };
+
+    select.addEventListener('change', toggle);
+    toggle();
+}
+
+initOtherOptionToggle('proof-type-select', 'proof-type-other-wrapper', 'proof-type-other');
+initOtherOptionToggle('proof-channel-select', 'proof-channel-other-wrapper', 'proof-channel-other');
+initOtherOptionToggle('proof-device-category', 'proof-device-category-other-wrapper', 'proof-device-category-other');
+

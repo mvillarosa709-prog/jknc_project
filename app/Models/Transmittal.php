@@ -62,6 +62,60 @@ class Transmittal extends Model
         ];
     }
 
+    public function getFromValueAttribute(): string
+    {
+        $direction = strtolower($this->direction ?? ($this->attributes['mode'] ?? 'send'));
+        if ($direction === 'receive') {
+            $party = $this->party_name ?? ($this->recipients->first()?->name ?: ($this->recipients->first()?->email ?? ''));
+            return (string) ($party ?: ($this->attributes['from_value'] ?? ''));
+        }
+
+        return (string) ($this->origin_office ?: ($this->office_name ?: ($this->attributes['from_value'] ?? 'John Kelly & Company')));
+    }
+
+    public function getToValueAttribute(): string
+    {
+        $direction = strtolower($this->direction ?? ($this->attributes['mode'] ?? 'send'));
+        if ($direction === 'receive') {
+            return (string) ($this->origin_office ?: ($this->office_name ?: ($this->attributes['to_value'] ?? 'John Kelly & Company')));
+        }
+
+        $party = $this->party_name ?? ($this->recipients->first()?->name ?: ($this->recipients->first()?->email ?: ($this->related_company ?? '')));
+        return (string) ($party ?: ($this->attributes['to_value'] ?? ''));
+    }
+
+    public function getDeliverySummaryAttribute(): string
+    {
+        $deliveryType = $this->delivery_type ?: ($this->attributes['delivery_type'] ?? '');
+        if ($deliveryType) {
+            $formatted = str_replace('_', ' ', (string) $deliveryType);
+            return ucwords($formatted);
+        }
+
+        $method = $this->delivery_method ?: ($this->attributes['delivery_method'] ?? '');
+        if ($method) {
+            return ucwords(str_replace('_', ' ', (string) $method));
+        }
+
+        return '';
+    }
+
+    public function getActionsSummaryAttribute(): string
+    {
+        $actions = $this->delivery_actions;
+        if (is_array($actions) && count($actions) > 0) {
+            return collect($actions)->map(fn ($a) => ucwords(str_replace('_', ' ', (string) $a)))->implode(', ');
+        }
+
+        $legacyActions = [];
+        if (!empty($this->action_delivery)) $legacyActions[] = 'Delivery';
+        if (!empty($this->action_pick_up)) $legacyActions[] = 'Pick Up';
+        if (!empty($this->action_drop_off)) $legacyActions[] = 'Drop Off';
+        if (!empty($this->action_email)) $legacyActions[] = 'Email';
+
+        return implode(', ', $legacyActions);
+    }
+
     public function rejector(): BelongsTo
     {
         return $this->belongsTo(User::class, 'rejected_by');
@@ -210,6 +264,16 @@ class Transmittal extends Model
     public function acknowledgments(): HasMany
     {
         return $this->hasMany(ExternalAcknowledgment::class);
+    }
+
+    public function receipt(): HasOne
+    {
+        return $this->hasOne(TransmittalReceipt::class)->latestOfMany();
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(TransmittalDocument::class);
     }
 
     public function authorityCode(): HasOne

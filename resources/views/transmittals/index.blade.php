@@ -2,7 +2,16 @@
 
 @section('title', 'Transmittals')
 
+@push('styles')
+    @vite(['resources/css/transmittal.css'])
+@endpush
+
+@push('scripts')
+    @vite(['resources/js/transmittal.js'])
+@endpush
+
 @section('content')
+<div class="page transmittal-index-page">
     @php
         $total = $summary->sum();
 
@@ -19,26 +28,24 @@
         ];
 
         $filters = [
-            'uploaded' => 'Uploaded',
             'all' => 'All',
+            'uploaded' => 'Uploaded',
             'submitted' => 'Submitted',
             'accepted' => 'Accepted',
             'reverted' => 'Reverted',
             'archived' => 'Archived',
-        
         ];
     @endphp
 
     {{-- Dashboard Header --}}
     <div class="transmittal-heading">
         <div>
-
-            <h1>Transmittal </h1>
+            <h1>Transmittal</h1>
         </div>
 
         <div class="heading-actions">
             <a
-                class="button smart-upload-button"
+                class="button primary smart-upload-button"
                 href="{{ route('transmittals.smart-upload') }}"
             >
                 Smart Upload
@@ -141,13 +148,17 @@
                     Search transmittals
                 </label>
 
-                <input
-                    id="register-search"
-                    type="search"
-                    name="q"
-                    value="{{ $search }}"
-                    placeholder="Search TRN, sender, recipient, client, tracking, document ID..."
-                >
+                <div class="relative w-full">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+                    <input
+                        id="register-search"
+                        type="search"
+                        name="q"
+                        value="{{ $search }}"
+                        placeholder="Search"
+                        class="w-full bg-gray-100 focus:bg-white border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-200 rounded-full pl-11 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 outline-none transition"
+                    >
+                </div>
             </form>
         </div>
 
@@ -234,7 +245,7 @@
 
                             {{-- Mode --}}
                             <td>
-                                <span class="mode-badge">
+                                <span class="mode-badge" style="color: #111827 !important; background: #f1f5f9; font-weight: 700;">
                                     {{ strtoupper($transmittal->direction ?? 'send') }}
                                 </span>
                             </td>
@@ -315,7 +326,7 @@
     >
         <div class="add-preview-toolbar">
             <strong>DOCUMENT PREVIEW</strong>
-            <span>2 PAGES · LIVE</span>
+            <span>LIVE</span>
 
             <button
                 type="button"
@@ -338,6 +349,7 @@
     @include('transmittals._form-drawer', [
         'transmittal' => $editTransmittal,
     ])
+</div>
 @endsection
 
 @push('scripts')

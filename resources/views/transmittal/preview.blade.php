@@ -48,23 +48,16 @@
 >
     <div class="bg-white border border-gray-200 rounded-xl min-h-[calc(100vh-7rem)] overflow-hidden">
 
-        {{-- TOP PAGE HEADER --}}
-        <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between bg-white">
+        {{-- TOP PAGE HEADER (MATCHING TRANSMITTAL EXACTLY) --}}
+        <div class="px-5 py-4 flex items-center justify-between border-b border-gray-200">
             <div>
-                <h1 class="text-[28px] font-semibold text-gray-800 leading-none">Transmittal Preview</h1>
-                <p class="text-sm text-gray-500 mt-1">{{ $transmittal->transmittal_no ?? 'N/A' }}</p>
+                <h1 class="text-[30px] font-semibold text-gray-800 leading-none">Transmittal Preview</h1>
+                <p class="text-xs text-gray-500 mt-1 font-mono">{{ $transmittal->transmittal_no ?? $transmittal->tracking_number ?? 'N/A' }}</p>
             </div>
 
             <div class="flex items-center gap-2">
-                <form method="POST" action="{{ route('transmittal.send-email', $transmittal->id) }}" onsubmit="return confirm('Send this transmittal by email with PDF and attachments?')">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition">
-                        Send Email
-                    </button>
-                </form>
-
                 <a href="{{ url('/transmittal') }}"
-                   class="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition">
+                   class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-full transition flex items-center gap-1.5">
                     Back
                 </a>
             </div>
@@ -78,9 +71,8 @@
             <div class="mx-5 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ session('error') }}</div>
         @endif
 
-        <div class="p-5 bg-[#f8fafc]">
-            <div class="grid grid-cols-1 2xl:grid-cols-[1fr_420px] gap-5">
-
+        <div class="p-5 bg-white">
+            <div class="w-full">
                 <div class="space-y-5">
                     <div class="border border-gray-200 rounded-xl overflow-visible bg-white">
 
@@ -94,7 +86,7 @@
                                         ? 'text-blue-600 border-b-2 border-blue-600'
                                         : 'text-gray-500 border-b-2 border-transparent hover:text-gray-700'"
                                     class="pb-3 text-sm font-medium transition">
-                                    Transmittal
+                                    Draft of Transmittal
                                 </button>
 
                                 <button
@@ -293,102 +285,6 @@
                         </div>
                     </div>
                 </div>
-
-                {{-- RIGHT SIDE --}}
-                <div class="space-y-4">
-                    <div class="border border-gray-200 rounded-xl bg-white p-5">
-                        <h3 class="text-[16px] font-semibold text-gray-900 mb-4">Transmittal Information</h3>
-
-                        <div class="space-y-3 text-sm">
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Ref No</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->transmittal_no ?? 'N/A' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Date</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->transmittal_date ?? 'N/A' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Mode</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->mode ?? 'N/A' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">From</span>
-                                <span class="font-medium text-gray-900">
-                                    {{ $transmittal->mode === 'SEND' ? ($transmittal->office_name ?? 'N/A') : ($transmittal->party_name ?? 'N/A') }}
-                                </span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">To</span>
-                                <span class="font-medium text-gray-900">
-                                    {{ $transmittal->mode === 'SEND' ? ($transmittal->party_name ?? 'N/A') : ($transmittal->office_name ?? 'N/A') }}
-                                </span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Address</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->address ?? 'N/A' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Delivery Type</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->delivery_type ?? 'N/A' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Recipient Email</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->recipient_email ?? 'N/A' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Workflow</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->workflow_status ?? 'N/A' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Approval</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->approval_status ?? 'N/A' }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="border border-gray-200 rounded-xl bg-white p-5">
-                        <h3 class="text-[16px] font-semibold text-gray-900 mb-4">Receipt Information</h3>
-
-                        <div class="space-y-3 text-sm">
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Receipt No</span>
-                                <span class="font-medium text-gray-900">{{ optional($transmittal->receipt)->receipt_no ?? 'Not yet generated' }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Receipt File</span>
-                                <span class="font-medium text-gray-900">{{ !empty($receiptPdfUrl) ? 'Available' : 'Not available' }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="border border-gray-200 rounded-xl bg-white p-5">
-                        <h3 class="text-[16px] font-semibold text-gray-900 mb-4">Attachment Summary</h3>
-
-                        <div class="space-y-3 text-sm">
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">With Files</span>
-                                <span class="font-medium text-gray-900">{{ $attachmentItems->count() }}</span>
-                            </div>
-
-                            <div class="grid grid-cols-[110px_1fr] gap-3">
-                                <span class="text-gray-500">Total Items</span>
-                                <span class="font-medium text-gray-900">{{ $transmittal->items->count() }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {{-- END RIGHT SIDE --}}
             </div>
         </div>
     </div>
