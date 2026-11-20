@@ -78,6 +78,8 @@ class RecordSearchService
                     ->orWhereRaw("source LIKE ? ESCAPE '!'", [$filters['q']])
                     ->orWhereRaw("external_reference_number LIKE ? ESCAPE '!'", [$filters['q']])
                     ->orWhereRaw("notes LIKE ? ESCAPE '!'", [$filters['q']])
+                    ->orWhereHas('files', fn (Builder $files) => $files->whereRaw("ocr_text LIKE ? ESCAPE '!'", [$filters['q']])
+                        ->orWhereRaw("original_name LIKE ? ESCAPE '!'", [$filters['q']]))
             ))
             // OCR text lives on the file rows, so a full-text hit is a whereHas.
             ->when($this->filled($filters, 'ocr'), fn (Builder $q) => $q->whereHas(

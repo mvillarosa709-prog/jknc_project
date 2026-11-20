@@ -58,12 +58,6 @@
                            aria-label="Document date to"
                            class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
 
-                    {{-- OCR text lives on the stored files, not on the record row. --}}
-                    <input type="search" name="ocr" value="{{ $filters['ocr'] }}"
-                           placeholder="Search document text..."
-                           aria-label="Search extracted document text"
-                           class="min-w-[190px] flex-1 rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
-
                     <x-ordo.button type="submit" variant="default">Apply</x-ordo.button>
 
                     <a href="{{ route('records.index') }}" class="text-[11px] text-ordo-blue">Reset</a>
