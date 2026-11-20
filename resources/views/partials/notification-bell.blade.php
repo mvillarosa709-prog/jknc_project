@@ -1,24 +1,27 @@
 @auth
     @php
-        $initialNotifications = auth()->user()
-            ->unreadNotifications()
-            ->latest()
-            ->take(10)
-            ->get()
-            ->map(fn ($notification) => [
-                'id' => $notification->id,
-                'title' => $notification->data['title'] ?? 'Notification',
-                'message' => $notification->data['message'] ?? ($notification->data['body'] ?? ''),
-                'url' => $notification->data['url'] ?? ($notification->data['action_url'] ?? ($notification->data['link'] ?? '#')),
-                'module' => $notification->data['module'] ?? ($notification->data['module_name'] ?? 'System'),
-                'icon' => $notification->data['icon'] ?? 'fa-bell',
-                'button_label' => $notification->data['button_label'] ?? 'Open',
-                'read_at' => $notification->read_at,
-                'created_at' => $notification->created_at?->diffForHumans(),
-            ])
-            ->values();
+        $hasNotificationsTable = \Illuminate\Support\Facades\Schema::hasTable('notifications');
+        $initialNotifications = ($hasNotificationsTable && auth()->user())
+            ? auth()->user()
+                ->unreadNotifications()
+                ->latest()
+                ->take(10)
+                ->get()
+                ->map(fn ($notification) => [
+                    'id' => $notification->id,
+                    'title' => $notification->data['title'] ?? 'Notification',
+                    'message' => $notification->data['message'] ?? ($notification->data['body'] ?? ''),
+                    'url' => $notification->data['url'] ?? ($notification->data['action_url'] ?? ($notification->data['link'] ?? '#')),
+                    'module' => $notification->data['module'] ?? ($notification->data['module_name'] ?? 'System'),
+                    'icon' => $notification->data['icon'] ?? 'fa-bell',
+                    'button_label' => $notification->data['button_label'] ?? 'Open',
+                    'read_at' => $notification->read_at,
+                    'created_at' => $notification->created_at?->diffForHumans(),
+                ])
+                ->values()
+            : collect();
 
-        $initialUnreadCount = auth()->user()->unreadNotifications()->count();
+        $initialUnreadCount = ($hasNotificationsTable && auth()->user()) ? auth()->user()->unreadNotifications()->count() : 0;
     @endphp
 
     <div
