@@ -587,6 +587,31 @@ function documentReading() {
         reReadMessage: '',
         reReadPoll: null,
         ocrSearchQuery: '',
+        showOcrSearch: false,
+
+        openOcrSearch() {
+            this.showOcrSearch = true;
+            this.$nextTick(() => {
+                const input = this.$refs.recordOcrSearchInput || this.$refs.ocrSearchInput;
+                if (input) {
+                    input.focus();
+                    input.select?.();
+                }
+            });
+        },
+
+        closeOcrSearch() {
+            this.showOcrSearch = false;
+            this.ocrSearchQuery = '';
+        },
+
+        toggleOcrSearch() {
+            if (this.showOcrSearch) {
+                this.closeOcrSearch();
+            } else {
+                this.openOcrSearch();
+            }
+        },
 
         escapeHtml(text) {
             return String(text ?? '')
@@ -851,6 +876,7 @@ function documentReading() {
             this.reReadStatus = '';
             this.reReadMessage = '';
             this.ocrSearchQuery = '';
+            this.showOcrSearch = false;
         },
     };
 }

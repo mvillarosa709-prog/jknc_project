@@ -101,9 +101,7 @@
 
                     <x-ordo.button type="submit" variant="default">Apply</x-ordo.button>
 
-                    @if ($search !== '' || $type !== '')
-                        <a href="{{ route('records.unclassified') }}" class="text-[11px] text-ordo-blue">Reset</a>
-                    @endif
+                    <a href="{{ route('records.unclassified') }}" class="text-[11px] text-ordo-blue">Reset</a>
                 </form>
 
                 <x-ordo.button type="button" variant="default" x-on:click="$dispatch('ordo:bulk-open')">
