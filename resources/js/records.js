@@ -294,6 +294,41 @@ Alpine.data('queueTable', (rowIds) => ({
     },
 }));
 
+Alpine.data('intakeDetails', (items = []) => ({
+    items: Array.isArray(items) ? items : [],
+    current: null,
+    open: false,
+
+    openFor(id) {
+        if (!id) return;
+        this.current = (this.items ?? []).find((item) => String(item.id) === String(id)) ?? null;
+        if (this.current) {
+            this.open = true;
+        }
+    },
+
+    close() {
+        this.open = false;
+        this.current = null;
+    },
+
+    get currentFile() {
+        if (!this.current?.files || !this.current.files.length) {
+            return null;
+        }
+        return typeof currentMaster === 'function'
+            ? currentMaster(this.current.files)
+            : this.current.files[0];
+    },
+
+    humanSize(bytes) {
+        if (!bytes || bytes <= 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+    },
+}));
+
 /**
  * Inline upload for the Unclassified Records queue.
  *
