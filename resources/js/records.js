@@ -566,7 +566,7 @@ function documentReading() {
             return String(str ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         },
 
-        get highlightedOcrText() {
+        getHighlightedOcrText() {
             const raw = this.master?.ocrText ?? '';
             if (! raw) {
                 return '';
@@ -579,7 +579,7 @@ function documentReading() {
             return this.escapeHtml(raw).replace(regex, '<mark class="bg-amber-200 text-slate-900 rounded px-0.5 font-bold">$1</mark>');
         },
 
-        get ocrMatchCount() {
+        getOcrMatchCount() {
             const raw = this.master?.ocrText ?? '';
             const q = (this.ocrSearchQuery || '').trim();
             if (! raw || ! q) {
@@ -899,6 +899,14 @@ Alpine.data('recordDrawer', (records, pickerUrl, reReadUrl, statusUrl, supportin
         // string, the pane rendered an iframe labelled with the master's name
         // pointed at a supporting file, and showed nothing.
         return currentMaster(this.current?.files ?? []);
+    },
+
+    get highlightedOcrText() {
+        return this.getHighlightedOcrText();
+    },
+
+    get ocrMatchCount() {
+        return this.getOcrMatchCount();
     },
 
     get supportingFiles() {
@@ -1855,6 +1863,14 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
         // files[0], which only agreed with the server by accident because the
         // payload carried no explicit order.
         return currentMaster(this.current?.files ?? []);
+    },
+
+    get highlightedOcrText() {
+        return this.getHighlightedOcrText();
+    },
+
+    get ocrMatchCount() {
+        return this.getOcrMatchCount();
     },
 
     get classificationOptions() {

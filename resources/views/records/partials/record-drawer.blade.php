@@ -140,9 +140,9 @@
                                                         class="px-1.5 py-1 text-[10px] text-ordo-muted hover:text-ordo-ink">Clear</button>
                                             </template>
                                         </div>
-                                        <div class="min-h-0 flex-1 overflow-auto">
-                                            <pre class="whitespace-pre-wrap font-mono text-[11px] leading-[1.55] text-ordo-ink"
-                                                 x-html="highlightedOcrText"></pre>
+                                        <div class="min-h-0 flex-1 overflow-auto rounded-lg border border-ordo-line bg-[#f8fafc] p-3.5 shadow-2xs">
+                                            <pre class="whitespace-pre-wrap font-mono text-[11px] leading-[1.6] text-ordo-ink"
+                                                 x-html="highlightedOcrText || escapeHtml(master?.ocrText || '')"></pre>
                                         </div>
                                     </div>
                                 </template>
