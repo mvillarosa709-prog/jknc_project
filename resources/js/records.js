@@ -2253,17 +2253,13 @@ Alpine.data('recordsSetup', (tabUrl, initialTab, initiallyOpen) => ({
     openSetup(tab = null) {
         this.open = true;
 
-        if (tab && tab !== this.tab) {
+        if (tab) {
             this.select(tab);
-
             return;
         }
 
-        // Opening the modal the first time loads the default tab. Reopening keeps
-        // whatever was on screen, so the user does not lose their place after
-        // looking at a different tab.
         if (this.html === '') {
-            this.select(this.tab);
+            this.select(this.tab || 'classifications');
         }
     },
 

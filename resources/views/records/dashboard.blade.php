@@ -26,29 +26,29 @@
         <div class="px-4 py-4">
 
             {{-- ============ HEADLINE FIGURES ============ --}}
-            <div class="mb-3 grid grid-cols-4 gap-2.5 max-[1180px]:grid-cols-2 max-[620px]:grid-cols-1">
-                <div class="integration-card">
-                    <span>Total Records</span>
-                    <strong>{{ number_format($counts['active']) }}</strong>
-                    <small class="mt-1 block text-[9px] text-ordo-faint">Classified and active records</small>
+            <div class="mb-4 grid grid-cols-4 gap-3 max-[1180px]:grid-cols-2 max-[620px]:grid-cols-1">
+                <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Total Records</span>
+                    <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['active']) }}</strong>
+                    <small class="mt-1 block text-[10px] text-ordo-faint">Classified and active records</small>
                 </div>
 
-                <div class="integration-card">
-                    <span>Unclassified Records</span>
-                    <strong>{{ number_format($counts['open_intake']) }}</strong>
-                    <small class="mt-1 block text-[9px] text-ordo-faint">Uploaded and waiting for classification</small>
+                <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Unclassified Records</span>
+                    <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['open_intake']) }}</strong>
+                    <small class="mt-1 block text-[10px] text-ordo-faint">Uploaded and waiting for classification</small>
                 </div>
 
-                <div class="integration-card">
-                    <span>Records Added</span>
-                    <strong>{{ number_format($counts['added_this_month']) }}</strong>
-                    <small class="mt-1 block text-[9px] text-ordo-faint">This month</small>
+                <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Records Added</span>
+                    <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['added_this_month']) }}</strong>
+                    <small class="mt-1 block text-[10px] text-ordo-faint">This month</small>
                 </div>
 
-                <div class="integration-card">
-                    <span>Records Updated</span>
-                    <strong>{{ number_format($counts['updated_this_month']) }}</strong>
-                    <small class="mt-1 block text-[9px] text-ordo-faint">This month</small>
+                <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Records Updated</span>
+                    <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['updated_this_month']) }}</strong>
+                    <small class="mt-1 block text-[10px] text-ordo-faint">This month</small>
                 </div>
             </div>
 
