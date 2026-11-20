@@ -1743,6 +1743,10 @@ Alpine.data('reportBuilder', (indexesByCode, generateUrl, exportUrl, storeRunUrl
 
 Alpine.data('classificationBrowser', (scheme, initialMode = null, initialParent = '') => ({
     query: '',
+    searchQuery: '',
+    selectedClassification: '',
+    appliedQuery: '',
+    appliedClassification: '',
     mode: initialMode,
     parent: initialParent,
     scheme,
@@ -1764,15 +1768,41 @@ Alpine.data('classificationBrowser', (scheme, initialMode = null, initialParent 
         is_active: true,
     },
 
+    applyFilters() {
+        this.appliedQuery = (this.searchQuery || '').trim();
+        this.appliedClassification = (this.selectedClassification || '').trim();
+    },
+
+    resetFilters() {
+        this.query = '';
+        this.searchQuery = '';
+        this.selectedClassification = '';
+        this.appliedQuery = '';
+        this.appliedClassification = '';
+    },
+
     /**
-     * A block is visible when the term appears anywhere in its text.
+     * A block is visible when it matches the applied classification and query.
      */
-    matches(text) {
-        if (this.query === '') {
-            return true;
+    matches(text, code = null) {
+        let entryCode = code;
+        if (!entryCode) {
+            const entry = (this.scheme ?? []).find((e) => e.text === text || e.code === text);
+            entryCode = entry ? entry.code : '';
         }
 
-        return String(text).toLowerCase().includes(this.query.trim().toLowerCase());
+        if (this.appliedClassification !== '') {
+            if (entryCode && String(entryCode) !== String(this.appliedClassification)) {
+                return false;
+            }
+        }
+
+        const q = (this.appliedQuery || this.query || '').trim().toLowerCase();
+        if (q !== '') {
+            return String(text ?? '').toLowerCase().includes(q);
+        }
+
+        return true;
     },
 
     textFor(code) {
@@ -1784,7 +1814,7 @@ Alpine.data('classificationBrowser', (scheme, initialMode = null, initialParent 
     },
 
     get visibleCount() {
-        return (this.scheme ?? []).filter((entry) => this.matches(entry.text)).length;
+        return (this.scheme ?? []).filter((entry) => this.matches(entry.text, entry.code)).length;
     },
 
     open(mode, parent = '') {

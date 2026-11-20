@@ -30,19 +30,41 @@
 
         <div class="px-5 py-4">
 
-            {{-- Toolbar: live search plus the size of the scheme --}}
+            {{-- Toolbar: search + classification dropdown + Apply + Reset --}}
             <div class="-mx-5 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-ordo-line bg-[#fbfcfe] px-5 py-3">
-                <div class="relative min-w-[260px] flex-1 max-w-md">
-                    <input type="search" name="q" x-model="query"
-                           placeholder="Search Classification Code, Index Code or name..."
-                           aria-label="Search the classification scheme"
-                           class="w-full rounded-lg border border-ordo-line bg-white pl-9 pr-3 py-2 text-[12px] outline-none transition-colors focus:border-ordo-blue focus:ring-1 focus:ring-ordo-blue" />
-                    <svg class="absolute left-3 top-2.5 h-4 w-4 text-ordo-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                <div class="flex flex-1 flex-wrap items-center gap-2">
+                    <div class="relative min-w-[240px] flex-1 max-w-md">
+                        <input type="search" x-model="searchQuery"
+                               x-on:keydown.enter.prevent="applyFilters()"
+                               placeholder="Search Classification Code, Index Code or name..."
+                               aria-label="Search the classification scheme"
+                               class="w-full rounded-lg border border-ordo-line bg-white pl-9 pr-3 py-2 text-[12px] outline-none transition-colors focus:border-ordo-blue focus:ring-1 focus:ring-ordo-blue" />
+                        <svg class="absolute left-3 top-2.5 h-4 w-4 text-ordo-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+
+                    <select x-model="selectedClassification"
+                            aria-label="Filter by classification"
+                            class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-[12px] outline-none transition-colors focus:border-ordo-blue focus:ring-1 focus:ring-ordo-blue">
+                        <option value="">All Classifications</option>
+                        @foreach ($classifications as $classification)
+                            <option value="{{ $classification->code }}">
+                                {{ $classification->code }} — {{ $classification->name }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <x-ordo.button type="button" variant="default" x-on:click="applyFilters()">Apply</x-ordo.button>
+
+                    <button type="button" x-on:click="resetFilters()"
+                            class="text-[11px] text-ordo-blue hover:underline bg-transparent border-0 cursor-pointer p-0">
+                        Reset
+                    </button>
                 </div>
 
-                <span class="text-[11px] font-medium text-ordo-muted bg-white border border-ordo-line rounded-lg px-2.5 py-1.5 shadow-2xs">
+                <span class="text-[11px] font-medium text-ordo-muted bg-white border border-ordo-line rounded-lg px-2.5 py-1.5 shadow-2xs shrink-0"
+                      x-text="(appliedQuery || appliedClassification) ? visibleCount + ' shown' : '{{ $classifications->count() }} classifications'">
                     {{ $classifications->count() }} classifications
                 </span>
             </div>
@@ -51,13 +73,13 @@
             <x-ordo.classification-tree :classifications="$classifications" :can-manage="false" :editable="false" />
 
             {{-- Search Miss State --}}
-            <template x-if="visibleCount === 0 && query !== ''">
+            <template x-if="visibleCount === 0 && (appliedQuery !== '' || appliedClassification !== '' || query !== '')">
                 <div class="mt-4 rounded-xl border border-ordo-line bg-white px-5 py-12 text-center shadow-xs">
                     <svg class="mx-auto h-8 w-8 text-ordo-muted mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p class="text-[13px] font-medium text-ordo-ink">No classification or index matches that search.</p>
-                    <p class="text-[11px] text-ordo-muted mt-1">Try checking for typos or searching by another keyword or code.</p>
+                    <p class="text-[13px] font-medium text-ordo-ink">No classification or index matches that filter.</p>
+                    <p class="text-[11px] text-ordo-muted mt-1">Try checking for typos or selecting another classification.</p>
                 </div>
             </template>
 

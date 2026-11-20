@@ -2,7 +2,7 @@
 
 <div class="space-y-3.5 py-1.5">
     @forelse ($classifications as $classification)
-        <div x-show="matches(textFor(@js($classification->code)))"
+        <div x-show="matches(textFor(@js($classification->code)), @js($classification->code))"
              class="overflow-hidden rounded-xl border border-ordo-line bg-white shadow-xs transition-shadow hover:shadow-sm">
 
             {{-- Classification Header --}}
