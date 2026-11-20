@@ -11,17 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('companies', function (Blueprint $table) {
-            $table->id();
-            $table->string('company_name');
-            $table->string('email')->nullable();
-            $table->string('phone')->nullable();
-            $table->string('website')->nullable();
-            $table->text('description')->nullable();
-            $table->text('address')->nullable();
-            $table->string('owner_name')->nullable();
-            $table->timestamps();
-        });
+        if (! Schema::hasTable('companies')) {
+            Schema::create('companies', function (Blueprint $table) {
+                $table->id();
+                $table->string('company_name');
+                $table->string('email')->nullable();
+                $table->string('phone')->nullable();
+                $table->string('website')->nullable();
+                $table->text('description')->nullable();
+                $table->text('address')->nullable();
+                $table->string('owner_name')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**
