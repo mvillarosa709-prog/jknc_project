@@ -31,6 +31,11 @@ class RecordActivityLog extends Model
         ];
     }
 
+    public function setUserIdAttribute($value): void
+    {
+        $this->attributes['user_id'] = $value instanceof Model ? $value->getKey() : $value;
+    }
+
     protected static function booted(): void
     {
         static::updating(function (): void {

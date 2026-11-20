@@ -62,6 +62,11 @@ class RecordFile extends Model
         ];
     }
 
+    public function setUploadedByAttribute($value): void
+    {
+        $this->attributes['uploaded_by'] = $value instanceof Model ? $value->getKey() : $value;
+    }
+
     public function intakeItem(): BelongsTo
     {
         return $this->belongsTo(RecordIntakeItem::class, 'record_intake_item_id');

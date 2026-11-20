@@ -69,6 +69,16 @@ class Record extends Model
         ];
     }
 
+    public function setCreatedByAttribute($value): void
+    {
+        $this->attributes['created_by'] = $value instanceof Model ? $value->getKey() : $value;
+    }
+
+    public function setFiledByAttribute($value): void
+    {
+        $this->attributes['filed_by'] = $value instanceof Model ? $value->getKey() : $value;
+    }
+
     public function classification(): BelongsTo
     {
         return $this->belongsTo(RecordClassification::class, 'record_classification_id');

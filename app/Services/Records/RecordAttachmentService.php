@@ -80,7 +80,7 @@ class RecordAttachmentService
             'source' => $attributes['source'] ?? null,
             'document_date' => $attributes['document_date'] ?? null,
             'external_reference_number' => $attributes['external_reference_number'] ?? null,
-            'uploaded_by' => $user,
+            'uploaded_by' => $user instanceof \Illuminate\Database\Eloquent\Model ? $user->getKey() : $user,
         ]);
 
         return $this->filing->file($item, [
@@ -135,7 +135,7 @@ class RecordAttachmentService
                     'page_count' => $details['page_count'],
                     'checksum_sha256' => $details['sha256'],
                     'ocr_status' => OcrStatus::Queued,
-                    'uploaded_by' => $user,
+                    'uploaded_by' => $user instanceof \Illuminate\Database\Eloquent\Model ? $user->getKey() : $user,
                     'version' => $version,
                 ]);
             } catch (Throwable $e) {
