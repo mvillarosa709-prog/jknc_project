@@ -16,7 +16,7 @@ return [
     |
     */
 
-    'default_role' => env('ORDO_DEFAULT_ROLE', 'records_manager'),
+    'default_role' => env('ORDO_DEFAULT_ROLE', 'system_admin'),
 
     /*
     |---------------------------------------------------------------------------

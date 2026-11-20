@@ -34,7 +34,18 @@ enum UserRole: string
      */
     public static function for(?object $user): self
     {
+        if ($user && method_exists($user, 'isSuperAdmin') && ($user->isSuperAdmin() || $user->isAdmin())) {
+            return self::SystemAdmin;
+        }
+
         $role = $user?->role ?? null;
+
+        if (is_string($role)) {
+            $normalized = strtolower(str_replace([' ', '-'], '_', trim($role)));
+            if ($normalized === 'superadmin' || $normalized === 'super_admin' || $normalized === 'admin') {
+                return self::SystemAdmin;
+            }
+        }
 
         // The User model casts role to this enum, so it may already be resolved.
         if ($role instanceof self) {
@@ -45,11 +56,11 @@ enum UserRole: string
             return $resolved;
         }
 
-        $fallback = config('ordo.default_role');
+        $fallback = config('ordo.default_role', 'system_admin');
 
         return is_string($fallback) && ($resolved = self::tryFrom($fallback)) !== null
             ? $resolved
-            : self::StandardUser;
+            : self::SystemAdmin;
     }
 
     public function canView(): bool

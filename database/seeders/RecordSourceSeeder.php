@@ -37,13 +37,14 @@ class RecordSourceSeeder extends Seeder
             ['name' => 'ORDO'],
         );
 
-        $companies = Company::query()
-            ->where('tenant_id', $tenant->id)
-            ->orderBy('created_at')
-            ->get();
+        $companies = Company::all();
 
         foreach ($companies as $company) {
-            $this->seedForCompany($tenant->id, $company);
+            $tenantId = $company->tenant_id ?: $tenant->id;
+            if (! $company->tenant_id) {
+                $company->update(['tenant_id' => $tenantId]);
+            }
+            $this->seedForCompany($tenantId, $company);
         }
     }
 

@@ -8,6 +8,31 @@
     <link rel="icon" type="image/png" href="{{ asset('images/image.png') }}">
 
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ordo-blue': '#2f62e7',
+                        'ordo-blue-soft': '#eaf1ff',
+                        'ordo-blue-border': '#d8e5ff',
+                        'ordo-ink': '#1f2937',
+                        'ordo-muted': '#6b7280',
+                        'ordo-faint': '#9ca3af',
+                        'ordo-line': '#e5e7eb',
+                        'ordo-bg': '#f8fafc',
+                        'ordo-panel': '#ffffff',
+                        'ordo-success': '#1f8f5f',
+                        'ordo-warn': '#a76a00',
+                        'ordo-danger': '#c13d3d',
+                    },
+                    boxShadow: {
+                        'ordo': '0 2px 9px rgba(15, 23, 42, 0.07)',
+                    }
+                }
+            }
+        };
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     @stack('styles')
@@ -44,7 +69,7 @@
     </style>
 
     @if(file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
 
