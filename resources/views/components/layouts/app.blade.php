@@ -1,5 +1,5 @@
 @php
-    $setupTabUrl = route('records.setup.tab', ['tab' => '__TAB__']);
+    $setupTabUrl = route('records.setup.tab', ['tab' => '__TAB__'], false);
     $setupInitialTab = session('setup_tab', 'classifications');
     $setupInitiallyOpen = session()->has('setup_tab');
 @endphp

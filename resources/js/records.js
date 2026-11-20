@@ -2293,6 +2293,12 @@ Alpine.data('recordsSetup', (tabUrl, initialTab, initiallyOpen) => ({
     tabUrl,
     initialTab,
 
+    init() {
+        if (this.open) {
+            this.select(this.tab || 'classifications');
+        }
+    },
+
     // The tabs the modal offers, in the order the reference mock presents them.
     // The labels are the mock's, including its singular "Records Classification".
     tabs: [
@@ -2344,8 +2350,13 @@ Alpine.data('recordsSetup', (tabUrl, initialTab, initiallyOpen) => ({
         const token = document.querySelector('meta[name="csrf-token"]')?.content
             ?? document.querySelector('input[name="_token"]')?.value;
 
+        // Ensure relative URL to avoid any CORS issues between 127.0.0.1 and localhost
+        const rawUrl = this.tabUrl || '/records/setup/__TAB__';
+        const relativeUrl = rawUrl.replace(/^https?:\/\/[^\/]+/, '');
+        const targetUrl = relativeUrl.replace('__TAB__', encodeURIComponent(requested));
+
         try {
-            const response = await fetch(this.tabUrl.replace('__TAB__', encodeURIComponent(requested)), {
+            const response = await fetch(targetUrl, {
                 headers: {
                     'X-CSRF-TOKEN': token,
                     'X-Requested-With': 'XMLHttpRequest',
@@ -2365,6 +2376,13 @@ Alpine.data('recordsSetup', (tabUrl, initialTab, initiallyOpen) => ({
             }
 
             this.html = markup;
+
+            this.$nextTick(() => {
+                const container = this.$el?.querySelector('[role="status"]');
+                if (container && window.Alpine) {
+                    window.Alpine.initTree(container);
+                }
+            });
         } catch (e) {
             this.error = 'That setup section could not be loaded.';
         } finally {
