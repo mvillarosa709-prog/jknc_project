@@ -1757,3 +1757,6 @@ Route::middleware(['auth', 'prevent-back-history', \App\Http\Middleware\EnsurePa
             ->middleware('human-capital.module:access_hc_employee_requests,true');
     });
 });
+
+require __DIR__.'/records.php';
+

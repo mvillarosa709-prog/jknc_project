@@ -1,3 +1,4 @@
+import './records';
 import { PDFDocument } from 'pdf-lib';
 import { Unzip, UnzipInflate, UnzipPassThrough } from 'fflate';
 

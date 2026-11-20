@@ -158,6 +158,7 @@
             request()->routeIs('deals*'), request()->routeIs('sales-marketing*') => 'sales',
             request()->routeIs('contacts*'), request()->routeIs('company*') => 'accounts',
             request()->routeIs('activities*'), request()->routeIs('regular*'), request()->routeIs('project*'), request()->routeIs('transmittal*'), request()->routeIs('transmittals*') => 'operations',
+            request()->routeIs('records*') => 'record',
             default => '',
         };
 
@@ -165,6 +166,7 @@
         $isSalesActive = $activeSidebarGroup === 'sales';
         $isAccountsActive = $activeSidebarGroup === 'accounts';
         $isOperationsActive = $activeSidebarGroup === 'operations';
+        $isRecordActive = $activeSidebarGroup === 'record';
     @endphp
 
     <!-- HEADER -->
@@ -515,12 +517,79 @@
                             </div>
                         </div>
                     @endif
+
+                    {{-- Record --}}
+                    <div class="space-y-1">
+                        <button type="button" @click="toggleGroup('record')" title="Record"
+                            :class="expanded ? 'justify-start px-3' : 'justify-center px-0'"
+                            class="w-full flex items-center gap-3 py-2.5 rounded-xl transition border {{ $isRecordActive ? 'bg-blue-50 text-blue-700 border-blue-100 font-semibold' : 'border-transparent text-gray-700 hover:bg-gray-50 hover:text-gray-900' }}">
+                            <span class="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center {{ $isRecordActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500' }}"><i class="fas fa-folder-open text-xs"></i></span>
+                            <span x-show="expanded" x-transition.opacity.duration.200ms class="flex-1 text-left whitespace-nowrap">Record</span>
+                            <i x-show="expanded" class="fas fa-chevron-right text-[11px] transition-transform duration-200" :class="isOpen('record') ? 'rotate-90' : ''"></i>
+                        </button>
+                        <div x-cloak x-show="isOpen('record')" x-collapse.duration.200ms class="ml-11 space-y-1 border-l border-gray-100 pl-3">
+                            <a href="{{ route('records.index') }}" class="block rounded-lg px-3 py-2 transition {{ request()->routeIs('records*') ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}">Record-Manager</a>
+                        </div>
+                    </div>
                 </div>
             </nav>
         </aside>
 
         <!-- SECOND SIDEBAR -->
-        @if(request()->routeIs('townhall*'))
+        @if(request()->routeIs('records*'))
+            <aside class="w-72 bg-white border-r border-gray-200 flex flex-col">
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Record-Manager</p>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3">
+                    <div class="space-y-1 text-sm">
+                        <a href="{{ route('records.dashboard') }}"
+                           class="block px-3 py-2 rounded-lg transition
+                           {{ request()->routeIs('records.dashboard') ? 'bg-blue-50 text-blue-700 border border-blue-100 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                            Dashboard
+                        </a>
+
+                        <a href="{{ route('records.unclassified') }}"
+                           class="block px-3 py-2 rounded-lg transition
+                           {{ request()->routeIs('records.unclassified*') ? 'bg-blue-50 text-blue-700 border border-blue-100 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                            Unclassified Records
+                        </a>
+
+                        <a href="{{ route('records.index') }}"
+                           class="block px-3 py-2 rounded-lg transition
+                           {{ request()->routeIs('records.index') ? 'bg-blue-50 text-blue-700 border border-blue-100 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                            All Records
+                        </a>
+
+                        <a href="{{ route('records.logs') }}"
+                           class="block px-3 py-2 rounded-lg transition
+                           {{ request()->routeIs('records.logs*') ? 'bg-blue-50 text-blue-700 border border-blue-100 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                            Audit Log
+                        </a>
+
+                        <a href="{{ route('records.classifications') }}"
+                           class="block px-3 py-2 rounded-lg transition
+                           {{ request()->routeIs('records.classifications*') ? 'bg-blue-50 text-blue-700 border border-blue-100 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                            Classifications
+                        </a>
+
+                        <a href="{{ route('records.archive.index') }}"
+                           class="block px-3 py-2 rounded-lg transition
+                           {{ request()->routeIs('records.archive*') ? 'bg-blue-50 text-blue-700 border border-blue-100 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                            Archive
+                        </a>
+
+                        <a href="{{ route('records.reports.index') }}"
+                           class="block px-3 py-2 rounded-lg transition
+                           {{ request()->routeIs('records.reports*') ? 'bg-blue-50 text-blue-700 border border-blue-100 font-semibold' : 'hover:bg-gray-100 text-gray-700' }}">
+                            Reports
+                        </a>
+                    </div>
+                </div>
+            </aside>
+
+        @elseif(request()->routeIs('townhall*'))
             <aside class="w-72 bg-white border-r border-gray-200 flex flex-col">
                 <div class="px-4 py-3 border-b border-gray-100">
                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Town Hall</p>

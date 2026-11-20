@@ -18,6 +18,7 @@
     },
     "dependencies": {
         "fflate": "^0.8.3",
-        "pdf-lib": "^1.17.1"
+        "pdf-lib": "^1.17.1",
+        "alpinejs": "^3.17.4"
     }
 }

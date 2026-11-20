@@ -36,6 +36,11 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function roleOrDefault(): \App\Enums\UserRole
+    {
+        return \App\Enums\UserRole::for($this);
+    }
+
     public function canApproveTransmittals(): bool
     {
         return $this->transmittal_role === 'administrator' || $this->isSuperAdmin() || $this->isAdmin();
