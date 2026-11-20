@@ -1,4 +1,4 @@
-@props(['classifications', 'canManage' => false])
+@props(['classifications', 'canManage' => false, 'editable' => false])
 
 <div class="space-y-3.5 py-1.5">
     @forelse ($classifications as $classification)
@@ -27,9 +27,9 @@
                     </div>
                 </div>
 
-                {{-- Classification Actions --}}
-                <div class="flex items-center gap-2 max-[640px]:w-full max-[640px]:justify-end">
-                    @if ($canManage)
+                {{-- Classification Actions (Only visible in Setup/Settings when editable is true) --}}
+                @if ($canManage && $editable)
+                    <div class="flex items-center gap-2 max-[640px]:w-full max-[640px]:justify-end">
                         <button type="button"
                                 x-on:click="openEditClassification({
                                     id: @js($classification->id),
@@ -53,8 +53,8 @@
                             </svg>
                             Add Index
                         </button>
-                    @endif
-                </div>
+                    </div>
+                @endif
             </div>
 
             {{-- Children: Indexes List --}}
@@ -83,7 +83,7 @@
 
                         {{-- Index Actions --}}
                         <div class="flex items-center gap-3.5 max-[640px]:w-full max-[640px]:justify-end">
-                            @if ($canManage)
+                            @if ($canManage && $editable)
                                 <button type="button"
                                         x-on:click="openEditIndex({
                                             id: @js($index->id),
