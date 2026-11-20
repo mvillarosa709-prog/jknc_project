@@ -8,15 +8,7 @@
 --}}
 <div x-data="classificationBrowser(@js($scheme))">
 
-    @if ($canManage)
-        {{-- No "+ Add Index" here either: it opened the dialog with no parent
-             chosen, and that dialog's Save stays disabled until one is. An Index
-             is added from the Classification it belongs under, in the tree below. --}}
-        <div class="mb-3">
-            <x-ordo.button type="button" variant="primary"
-                           x-on:click="open('classification')">+ Add Classification</x-ordo.button>
-        </div>
-    @endif
+
 
     <div class="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-ordo-line bg-[#fbfcfe] px-3 py-2.5">
         <input type="search" name="setup_scheme_q" x-model="query"

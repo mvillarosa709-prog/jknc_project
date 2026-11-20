@@ -32,6 +32,12 @@ Route::middleware('ordo.context')->group(function (): void {
     Route::post('/records/classifications/{classification}/indexes', [RecordClassificationController::class, 'storeIndex'])
         ->name('records.classifications.indexes.store');
 
+    Route::put('/records/classifications/{classification}', [RecordClassificationController::class, 'updateClassification'])
+        ->name('records.classifications.update');
+
+    Route::put('/records/indexes/{index}', [RecordClassificationController::class, 'updateIndex'])
+        ->name('records.indexes.update');
+
     Route::get('/records/archive', [RecordArchiveController::class, 'index'])
         ->name('records.archive.index');
 

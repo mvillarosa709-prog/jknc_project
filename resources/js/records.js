@@ -1672,23 +1672,31 @@ Alpine.data('reportBuilder', (indexesByCode, generateUrl, exportUrl, storeRunUrl
     },
 }));
 
-Alpine.data('classificationBrowser', (scheme) => ({
+Alpine.data('classificationBrowser', (scheme, initialMode = null, initialParent = '') => ({
     query: '',
-    mode: null,
-    parent: '',
-    // Bound as a property, not just captured by the closure. Every method below
-    // reads it back as `this.scheme`, and an argument that is only captured
-    // cannot be read that way — which made textFor() throw, which made the
-    // x-show on every scheme row evaluate falsy, which hid the whole tree while
-    // the page still reported "11 classifications" beside it.
+    mode: initialMode,
+    parent: initialParent,
     scheme,
+
+    editClass: {
+        id: '',
+        code: '',
+        name: '',
+        description: '',
+        is_active: true,
+    },
+
+    editIdx: {
+        id: '',
+        parent_code: '',
+        code: '',
+        name: '',
+        description: '',
+        is_active: true,
+    },
 
     /**
      * A block is visible when the term appears anywhere in its text.
-     *
-     * `text` holds the Classification's own code, name and description plus every
-     * Index beneath it, so the block is matched and hidden as a unit. That is what
-     * keeps an Index hit from leaving its parent Classification orphaned on screen.
      */
     matches(text) {
         if (this.query === '') {
@@ -1699,9 +1707,6 @@ Alpine.data('classificationBrowser', (scheme) => ({
     },
 
     textFor(code) {
-        // Falls back to an empty block rather than throwing. A search that cannot
-        // resolve a code should show everything; one that throws shows nothing,
-        // which turns a small mistake into a blank page.
         return (this.scheme ?? []).find((entry) => entry.code === code)?.text ?? '';
     },
 
@@ -1710,7 +1715,7 @@ Alpine.data('classificationBrowser', (scheme) => ({
     },
 
     get visibleCount() {
-        return this.scheme.filter((entry) => this.matches(entry.text)).length;
+        return (this.scheme ?? []).filter((entry) => this.matches(entry.text)).length;
     },
 
     open(mode, parent = '') {
@@ -1718,18 +1723,49 @@ Alpine.data('classificationBrowser', (scheme) => ({
         this.parent = parent;
     },
 
+    openEditClassification(item) {
+        this.editClass = {
+            id: item.id || '',
+            code: item.code || '',
+            name: item.name || '',
+            description: item.description || '',
+            is_active: item.is_active !== undefined ? Boolean(item.is_active) : true,
+        };
+        this.mode = 'edit_classification';
+    },
+
+    openEditIndex(item, parentCode = '') {
+        this.editIdx = {
+            id: item.id || '',
+            parent_code: parentCode || '',
+            code: item.code || '',
+            name: item.name || '',
+            description: item.description || '',
+            is_active: item.is_active !== undefined ? Boolean(item.is_active) : true,
+        };
+        this.mode = 'edit_index';
+    },
+
     close() {
         this.mode = null;
     },
 
-    /**
-     * The Add Index form is built from the parent code rather than a route
-     * rendered per row, so one copy of the modal serves the whole tree.
-     */
     indexAction() {
         const base = document.querySelector('base')?.getAttribute('href') ?? '/';
 
         return `${base.replace(/\/$/, '')}/records/classifications/${encodeURIComponent(this.parent)}/indexes`;
+    },
+
+    updateClassificationAction() {
+        const base = document.querySelector('base')?.getAttribute('href') ?? '/';
+
+        return `${base.replace(/\/$/, '')}/records/classifications/${encodeURIComponent(this.editClass.id)}`;
+    },
+
+    updateIndexAction() {
+        const base = document.querySelector('base')?.getAttribute('href') ?? '/';
+
+        return `${base.replace(/\/$/, '')}/records/indexes/${encodeURIComponent(this.editIdx.id)}`;
     },
 }));
 

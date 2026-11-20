@@ -1,99 +1,120 @@
-{{--
-    The Classification scheme as a two-level tree.
-
-    One continuous list rather than a card per Classification, so the rows read as
-    one structure. The four-column grid is what makes a parent row and the Indexes
-    beneath it line up: the status column is fixed width so every pill starts in
-    the same place, and the action column is fixed and right-aligned so every link
-    ends in the same place. Measured off the reference stylesheet.
-
-    Rendered by both the Classifications page and the Records Management Setup
-    modal. They show the same scheme, so they share this component rather than
-    each carrying a copy that can drift from the other.
-
-    Search is not handled here: the enclosing panel owns the browser component
-    that hides a whole block when the term misses, so a Classification is never
-    left on screen without the Indexes that matched.
---}}
 @props(['classifications', 'canManage' => false])
 
-<div class="py-1.5">
+<div class="space-y-3.5 py-1.5">
     @forelse ($classifications as $classification)
-        <div x-show="matches(textFor(@js($classification->code)))">
+        <div x-show="matches(textFor(@js($classification->code)))"
+             class="overflow-hidden rounded-xl border border-ordo-line bg-white shadow-xs transition-shadow hover:shadow-sm">
 
-            {{-- Parent: the Classification itself.
+            {{-- Classification Header --}}
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-ordo-line bg-[#f8faff] px-4 py-3 max-[640px]:flex-col max-[640px]:items-start">
+                <div class="flex min-w-0 items-center gap-3">
+                    <span class="inline-flex shrink-0 items-center rounded-lg border border-blue-200/80 bg-blue-50 px-2.5 py-1 font-mono text-[13px] font-bold tracking-wide text-[#2b59c3]">
+                        {{ $classification->code }}
+                    </span>
 
-                 The code and name are set at 16px deliberately, not by accident.
-                 The reference mock's .class-row sets a font size for the
-                 description, the action and the pill, but never for the row
-                 itself, so its primary text inherits the browser default of
-                 16px. Stating the measured value here rather than leaving it to
-                 inheritance keeps it visible and stops a later tidy-up from
-                 quietly shrinking the scheme back down to body scale.
-
-                 The code is proportional, matching the mock: it puts no
-                 font-family on .class-row. The monospace face is reserved for
-                 the Document Reference chip, which is where the mock does use
-                 it. --}}
-            <div class="grid grid-cols-[90px_1fr_120px_90px] items-center gap-2.5 border-b border-ordo-line bg-[#fbfcfe] px-3 py-2.5 font-bold max-[640px]:grid-cols-1">
-                <span class="text-[16px] text-ordo-ink">{{ $classification->code }}</span>
-
-                <div class="min-w-0">
-                    <span class="text-[16px]">{{ $classification->name }}</span>
-                    @if ($classification->description)
-                        {{-- Weight is reset here: the parent row is bold, but a
-                             description set in bold reads as a second heading. --}}
-                        <div class="mt-0.5 font-normal text-[10px] leading-[1.5] text-[#6b7280]">
-                            {{ $classification->description }}
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[14px] font-bold text-ordo-ink truncate">{{ $classification->name }}</span>
+                            <x-ordo.pill :tone="$classification->is_active ? 'green' : 'neutral'">
+                                {{ $classification->is_active ? 'Active' : 'Inactive' }}
+                            </x-ordo.pill>
                         </div>
-                    @endif
+                        @if ($classification->description)
+                            <div class="mt-0.5 text-[11px] leading-relaxed text-[#6b7280]">
+                                {{ $classification->description }}
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
-                <x-ordo.pill :tone="$classification->is_active ? 'green' : 'neutral'">
-                    {{ $classification->is_active ? 'Active' : 'Inactive' }}
-                </x-ordo.pill>
-
-                <div class="text-right">
+                {{-- Classification Actions --}}
+                <div class="flex items-center gap-2 max-[640px]:w-full max-[640px]:justify-end">
                     @if ($canManage)
                         <button type="button"
+                                x-on:click="openEditClassification({
+                                    id: @js($classification->id),
+                                    code: @js($classification->code),
+                                    name: @js($classification->name),
+                                    description: @js($classification->description),
+                                    is_active: @js($classification->is_active)
+                                })"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-ordo-line bg-white px-2.5 py-1.5 text-[11px] font-medium text-ordo-ink shadow-xs transition-colors hover:bg-[#f3f4f6]">
+                            <svg class="h-3 w-3 text-ordo-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                            Edit
+                        </button>
+
+                        <button type="button"
                                 x-on:click="open('index', @js($classification->code))"
-                                class="border-0 bg-transparent p-0 text-[11px] text-ordo-blue transition-opacity hover:opacity-75">
-                            + Add Index
+                                class="inline-flex items-center gap-1.5 rounded-lg bg-ordo-blue px-3 py-1.5 text-[11px] font-semibold text-white shadow-xs transition-colors hover:bg-[#2753b8]">
+                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add Index
                         </button>
                     @endif
                 </div>
             </div>
 
-            {{-- Children: the Indexes beneath it. Same 16px as the Classification
-                     above and the same proportional code — one scheme, one
-                     scale. --}}
-            @forelse ($classification->indexes as $index)
-                <div class="grid grid-cols-[90px_1fr_120px_90px] items-center gap-2.5 border-b border-ordo-line px-3 py-2.5 pl-[36px] max-[640px]:grid-cols-1 max-[640px]:pl-3">
-                    <span class="text-[16px] text-ordo-ink">{{ $index->code }}</span>
+            {{-- Children: Indexes List --}}
+            <div class="divide-y divide-ordo-line bg-white">
+                @forelse ($classification->indexes as $index)
+                    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 pl-6 transition-colors hover:bg-[#fbfcfe] max-[640px]:flex-col max-[640px]:items-start max-[640px]:pl-4">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <span class="inline-flex shrink-0 items-center rounded-md border border-ordo-line bg-[#f8f9fa] px-2 py-0.5 font-mono text-[11px] font-medium text-[#4b5563]">
+                                {{ $index->code }}
+                            </span>
 
-                    <div class="min-w-0">
-                        <span class="text-[16px]">{{ $index->name }}</span>
-                        @if ($index->description)
-                            <div class="mt-0.5 text-[10px] leading-[1.5] text-[#6b7280]">
-                                {{ $index->description }}
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[12px] font-semibold text-ordo-ink">{{ $index->name }}</span>
+                                    <x-ordo.pill :tone="$index->is_active ? 'green' : 'neutral'">
+                                        {{ $index->is_active ? 'Active' : 'Inactive' }}
+                                    </x-ordo.pill>
+                                </div>
+                                @if ($index->description)
+                                    <div class="text-[10px] leading-relaxed text-[#6b7280]">
+                                        {{ $index->description }}
+                                    </div>
+                                @endif
                             </div>
-                        @endif
-                    </div>
+                        </div>
 
-                    <x-ordo.pill :tone="$index->is_active ? 'green' : 'neutral'">
-                        {{ $index->is_active ? 'Active' : 'Inactive' }}
-                    </x-ordo.pill>
+                        {{-- Index Actions --}}
+                        <div class="flex items-center gap-3.5 max-[640px]:w-full max-[640px]:justify-end">
+                            @if ($canManage)
+                                <button type="button"
+                                        x-on:click="openEditIndex({
+                                            id: @js($index->id),
+                                            code: @js($index->code),
+                                            name: @js($index->name),
+                                            description: @js($index->description),
+                                            is_active: @js($index->is_active)
+                                        }, @js($classification->code))"
+                                        class="inline-flex items-center gap-1 text-[11px] font-medium text-ordo-muted transition-colors hover:text-ordo-blue">
+                                    <svg class="h-3 w-3 text-ordo-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                    </svg>
+                                    Edit
+                                </button>
+                            @endif
 
-                    <div class="text-right">
-                        <a href="{{ route('records.index', ['classification' => $classification->code, 'index' => $index->code]) }}"
-                           class="text-[11px] text-ordo-blue transition-opacity hover:opacity-75">View Records</a>
+                            <a href="{{ route('records.index', ['classification' => $classification->code, 'index' => $index->code]) }}"
+                               class="inline-flex items-center gap-1 text-[11px] font-medium text-ordo-blue transition-opacity hover:opacity-75">
+                                <span>View Records</span>
+                                <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </a>
+                        </div>
                     </div>
-                </div>
-            @empty
-                <div class="border-b border-ordo-line px-3 py-2.5 pl-[36px] text-[10px] text-ordo-faint max-[640px]:pl-3">
-                    No indexes under this classification yet.
-                </div>
-            @endforelse
+                @empty
+                    <div class="px-6 py-3 text-[11px] text-ordo-faint italic">
+                        No indexes under this classification yet.
+                    </div>
+                @endforelse
+            </div>
         </div>
     @empty
         <x-ordo.empty message="No classifications have been added for this company yet." />

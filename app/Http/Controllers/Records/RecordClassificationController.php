@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Records;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreClassificationRequest;
 use App\Http\Requests\StoreIndexRequest;
+use App\Http\Requests\UpdateClassificationRequest;
+use App\Http\Requests\UpdateIndexRequest;
 use App\Models\RecordClassification;
 use App\Models\RecordIndex;
 use App\Services\CompanyContext;
@@ -124,6 +126,48 @@ class RecordClassificationController extends Controller
         return back()
             ->with('setup_tab', 'classifications')
             ->with('status', sprintf('Index %s was added under %s.', $request->input('code'), $parent->code));
+    }
+
+    public function updateClassification(UpdateClassificationRequest $request, string $id): RedirectResponse
+    {
+        $classification = RecordClassification::query()
+            ->where('tenant_id', $request->tenantId())
+            ->where('company_id', $request->companyId())
+            ->where('id', $id)
+            ->firstOrFail();
+
+        $classification->update([
+            'code' => trim((string) $request->input('code')),
+            'name' => trim((string) $request->input('name')),
+            'description' => $request->input('description'),
+            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+        ]);
+
+        $this->forgetLookups();
+
+        return back()
+            ->with('status', sprintf('Classification %s was updated.', $classification->code));
+    }
+
+    public function updateIndex(UpdateIndexRequest $request, string $id): RedirectResponse
+    {
+        $index = RecordIndex::query()
+            ->where('tenant_id', $request->tenantId())
+            ->where('company_id', $request->companyId())
+            ->where('id', $id)
+            ->firstOrFail();
+
+        $index->update([
+            'code' => trim((string) $request->input('code')),
+            'name' => trim((string) $request->input('name')),
+            'description' => $request->input('description'),
+            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+        ]);
+
+        $this->forgetLookups();
+
+        return back()
+            ->with('status', sprintf('Index %s was updated.', $index->code));
     }
 
     /**
