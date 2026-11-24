@@ -28,10 +28,10 @@
                 <input type="search" name="q" value="{{ $filters['q'] }}"
                        placeholder="Search action or description..."
                        aria-label="Search the audit trail"
-                       class="min-w-[220px] flex-1 rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                       class="min-w-[220px] flex-1 rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue" />
 
                 <select name="action" aria-label="Filter by action type"
-                        class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                        class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue">
                     <option value="">All action types</option>
                     @foreach ($actions as $action)
                         <option value="{{ $action }}" @selected($filters['action'] === $action)>{{ $action }}</option>
@@ -40,27 +40,27 @@
 
                 <input type="date" name="from" value="{{ $filters['from'] }}" title="From date"
                        aria-label="From date"
-                       class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                       class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue" />
 
                 <input type="date" name="to" value="{{ $filters['to'] }}" title="To date"
                        aria-label="To date"
-                       class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                       class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue" />
 
-                <x-ordo.button type="submit" variant="default">Apply</x-ordo.button>
+                <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-[#1e293b] px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#1e293b] focus:ring-offset-1">Apply</button>
 
-                <a href="{{ route('records.logs') }}" class="text-[11px] text-ordo-blue">Reset</a>
+                <a href="{{ route('records.logs') }}" class="inline-flex items-center justify-center rounded-lg bg-[#334155] px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-sm transition hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#334155] focus:ring-offset-1">Reset</a>
             </form>
 
             <div class="mt-4 overflow-x-auto">
                 <table class="w-full border-collapse text-left">
                     <thead>
-                        <tr class="bg-[#fbfcfe] text-[10px] font-semibold text-ordo-muted">
-                            <th class="px-3 py-2.5">Timestamp</th>
-                            <th class="px-3 py-2.5">Action</th>
-                            <th class="px-3 py-2.5">Description</th>
-                            <th class="px-3 py-2.5">Subject</th>
-                            <th class="px-3 py-2.5">User</th>
-                            <th class="px-3 py-2.5"></th>
+                        <tr class="bg-[#f8fafc] text-xs font-semibold uppercase tracking-wider text-gray-600">
+                            <th class="px-3.5 py-3">Timestamp</th>
+                            <th class="px-3.5 py-3">Action</th>
+                            <th class="px-3.5 py-3">Description</th>
+                            <th class="px-3.5 py-3">Subject</th>
+                            <th class="px-3.5 py-3">User</th>
+                            <th class="px-3.5 py-3"></th>
                         </tr>
                     </thead>
 

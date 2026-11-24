@@ -28,27 +28,27 @@
             {{-- ============ HEADLINE FIGURES ============ --}}
             <div class="mb-4 grid grid-cols-4 gap-3 max-[1180px]:grid-cols-2 max-[620px]:grid-cols-1">
                 <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
-                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Total Records</span>
+                    <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Total Records</span>
                     <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['active']) }}</strong>
-                    <small class="mt-1 block text-[10px] text-ordo-faint">Classified and active records</small>
+                    <small class="mt-1 block text-xs text-gray-400">Classified and active records</small>
                 </div>
 
                 <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
-                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Unclassified Records</span>
+                    <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Unclassified Records</span>
                     <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['open_intake']) }}</strong>
-                    <small class="mt-1 block text-[10px] text-ordo-faint">Uploaded and waiting for classification</small>
+                    <small class="mt-1 block text-xs text-gray-400">Uploaded and waiting for classification</small>
                 </div>
 
                 <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
-                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Records Added</span>
+                    <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Records Added</span>
                     <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['added_this_month']) }}</strong>
-                    <small class="mt-1 block text-[10px] text-ordo-faint">This month</small>
+                    <small class="mt-1 block text-xs text-gray-400">This month</small>
                 </div>
 
                 <div class="rounded-xl border border-ordo-line bg-white p-4 shadow-xs">
-                    <span class="block text-[10px] font-bold uppercase tracking-wider text-ordo-muted">Records Updated</span>
+                    <span class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Records Updated</span>
                     <strong class="mt-1 block text-2xl font-extrabold text-ordo-ink leading-tight">{{ number_format($counts['updated_this_month']) }}</strong>
-                    <small class="mt-1 block text-[10px] text-ordo-faint">This month</small>
+                    <small class="mt-1 block text-xs text-gray-400">This month</small>
                 </div>
             </div>
 

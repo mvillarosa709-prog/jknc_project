@@ -38,7 +38,7 @@
                                x-on:keydown.enter.prevent="applyFilters()"
                                placeholder="Search Classification Code, Index Code or name..."
                                aria-label="Search the classification scheme"
-                               class="w-full rounded-lg border border-ordo-line bg-white pl-9 pr-3 py-2 text-[12px] outline-none transition-colors focus:border-ordo-blue focus:ring-1 focus:ring-ordo-blue" />
+                               class="w-full rounded-lg border border-ordo-line bg-white pl-9 pr-3 py-2 text-xs md:text-sm outline-none transition-colors focus:border-ordo-blue focus:ring-1 focus:ring-ordo-blue" />
                         <svg class="absolute left-3 top-2.5 h-4 w-4 text-ordo-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
@@ -46,7 +46,7 @@
 
                     <select x-model="selectedClassification"
                             aria-label="Filter by classification"
-                            class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-[12px] outline-none transition-colors focus:border-ordo-blue focus:ring-1 focus:ring-ordo-blue">
+                            class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none transition-colors focus:border-ordo-blue focus:ring-1 focus:ring-ordo-blue">
                         <option value="">All Classifications</option>
                         @foreach ($classifications as $classification)
                             <option value="{{ $classification->code }}">
@@ -55,10 +55,9 @@
                         @endforeach
                     </select>
 
-                    <x-ordo.button type="button" variant="default" x-on:click="applyFilters()">Apply</x-ordo.button>
+                    <button type="button" x-on:click="applyFilters()" class="inline-flex items-center justify-center rounded-lg bg-[#1e293b] px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#1e293b] focus:ring-offset-1">Apply</button>
 
-                    <button type="button" x-on:click="resetFilters()"
-                            class="text-[11px] text-ordo-blue hover:underline bg-transparent border-0 cursor-pointer p-0">
+                    <button type="button" x-on:click="resetFilters()" class="inline-flex items-center justify-center rounded-lg bg-[#334155] px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-sm transition hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#334155] focus:ring-offset-1">
                         Reset
                     </button>
                 </div>

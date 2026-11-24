@@ -89,19 +89,19 @@
                     <input type="search" name="q" value="{{ $search }}"
                            placeholder="Search uploaded files..."
                            aria-label="Search uploaded files"
-                           class="min-w-[200px] flex-1 rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                           class="min-w-[220px] flex-1 rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue" />
 
                     <select name="type" aria-label="Filter by file type"
-                            class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                            class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue">
                         <option value="">All file types</option>
                         <option value="image" @selected($type === 'image')>Images</option>
                         <option value="pdf" @selected($type === 'pdf')>PDF</option>
                         <option value="other" @selected($type === 'other')>Other</option>
                     </select>
 
-                    <x-ordo.button type="submit" variant="default">Apply</x-ordo.button>
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-[#1e293b] px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-sm transition hover:bg-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#1e293b] focus:ring-offset-1">Apply</button>
 
-                    <a href="{{ route('records.unclassified') }}" class="text-[11px] text-ordo-blue">Reset</a>
+                    <a href="{{ route('records.unclassified') }}" class="inline-flex items-center justify-center rounded-lg bg-[#334155] px-4 py-2 text-xs md:text-sm font-semibold text-white shadow-sm transition hover:bg-[#1e293b] focus:outline-none focus:ring-2 focus:ring-[#334155] focus:ring-offset-1">Reset</a>
                 </form>
 
                 <x-ordo.button type="button" variant="default" x-on:click="$dispatch('ordo:bulk-open')">
@@ -110,25 +110,24 @@
             </div>
 
             {{-- Row selection is held in a shared store so the bulk modal and the table agree. --}}
-            {{-- Row selection is held in a shared store so the bulk modal and the table agree. --}}
             <div class="overflow-x-auto"
                  x-data="queueTable(@js($intakeItems->pluck('id')->all()))"
                  x-on:ordo:selection-cleared.window="$store.queueSelection.clear()">
                 <table class="w-full border-collapse text-left">
                     <thead>
-                        <tr class="bg-[#fbfcfe] text-[10px] font-semibold text-ordo-muted">
-                            <th class="w-9 px-3 py-2.5">
+                        <tr class="bg-[#f8fafc] text-xs font-semibold uppercase tracking-wider text-gray-600">
+                            <th class="w-9 px-3.5 py-3">
                                 <input type="checkbox" aria-label="Select every unclassified record"
                                        x-ref="selectAll"
                                        x-on:change="toggleAll($event.target.checked)" />
                             </th>
-                            <th class="px-3 py-2.5">Doc Ref</th>
-                            <th class="px-3 py-2.5">File</th>
-                            <th class="px-3 py-2.5">Uploaded By</th>
-                            <th class="px-3 py-2.5">Uploaded</th>
-                            <th class="px-3 py-2.5">Size</th>
-                            <th class="px-3 py-2.5">Auto Read</th>
-                            <th class="px-3 py-2.5 text-right">Action</th>
+                            <th class="px-3.5 py-3">Doc Ref</th>
+                            <th class="px-3.5 py-3">File</th>
+                            <th class="px-3.5 py-3">Uploaded By</th>
+                            <th class="px-3.5 py-3">Uploaded</th>
+                            <th class="px-3.5 py-3">Size</th>
+                            <th class="px-3.5 py-3">Auto Read</th>
+                            <th class="px-3.5 py-3 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -138,44 +137,44 @@
                                 $reading = $item->files->firstWhere(fn ($file) => $file->ocr_status->label() !== 'Not read');
                                 $readingStatus = $reading?->ocr_status ?? $master?->ocr_status;
                             @endphp
-                            <tr class="border-t border-ordo-line text-[11px] hover:bg-[#fcfdff]"
+                            <tr class="border-t border-ordo-line text-xs md:text-sm hover:bg-[#fcfdff] transition-colors"
                                 x-bind:class="isSelected('{{ $item->id }}') ? 'bg-ordo-blue-soft' : ''"
                                 data-item-row="{{ $item->id }}">
-                                <td class="px-3 py-2.5">
+                                <td class="px-3.5 py-3">
                                     <input type="checkbox" value="{{ $item->id }}"
                                            aria-label="Select {{ $item->title }}"
                                            x-on:change="toggle('{{ $item->id }}', $event.target.checked)" />
                                 </td>
-                                <td class="px-3 py-2.5">
+                                <td class="px-3.5 py-3">
                                     {{-- Assigned at official filing, so an intake item has none yet. --}}
                                     <x-ordo.docref />
                                 </td>
-                                <td class="px-3 py-2.5">
+                                <td class="px-3.5 py-3">
                                     <div class="flex items-center gap-2.5">
-                                        <div class="grid h-10 w-[34px] shrink-0 place-items-center rounded-md border border-ordo-line bg-[#f3f4f6] text-[10px] text-ordo-muted">
+                                        <div class="grid h-10 w-[34px] shrink-0 place-items-center rounded-md border border-ordo-line bg-[#f3f4f6] text-xs font-semibold text-ordo-muted">
                                             {{ $master?->isImage() ? 'IMG' : ($master?->isPdf() ? 'PDF' : 'FILE') }}
                                         </div>
                                         <div class="min-w-0">
-                                            <strong class="block max-w-[260px] truncate text-[11px]">{{ $item->title }}</strong>
-                                            <small class="text-[9px] text-ordo-faint">
+                                            <strong class="block max-w-[280px] truncate text-xs md:text-sm font-semibold text-gray-900">{{ $item->title }}</strong>
+                                            <small class="text-xs text-gray-500">
                                                 {{ $item->files->count() }} file(s) &middot; {{ $master?->mime_type ?: 'unknown type' }}
                                             </small>
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-3 py-2.5 text-ordo-muted">
+                                <td class="px-3.5 py-3 text-gray-700">
                                     {{ $item->uploadedBy?->name ?? '—' }}
                                 </td>
-                                <td class="px-3 py-2.5 text-ordo-muted">
+                                <td class="px-3.5 py-3 text-gray-600">
                                     {{ $item->created_at->format('Y-m-d H:i') }}
                                 </td>
-                                <td class="px-3 py-2.5 text-ordo-muted">@fileSize($item->storage_bytes)</td>
-                                <td class="px-3 py-2.5">
+                                <td class="px-3.5 py-3 font-mono text-gray-700">@fileSize($item->storage_bytes)</td>
+                                <td class="px-3.5 py-3">
                                     <x-ordo.pill :tone="$readingStatus?->tone() ?? 'neutral'">
                                         {{ $readingStatus?->label() ?? 'Queued' }}
                                     </x-ordo.pill>
                                 </td>
-                                <td class="px-3 py-2.5">
+                                <td class="px-3.5 py-3">
                                     <div class="flex justify-end gap-2">
                                         <x-ordo.button type="button" variant="soft"
                                                        x-on:click="$dispatch('ordo:classify-open', { id: '{{ $item->id }}' })">

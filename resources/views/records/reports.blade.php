@@ -51,9 +51,9 @@
                          and makes the four filters read as one control. --}}
                     <div class="grid grid-cols-2 gap-2.5 max-[620px]:grid-cols-1">
                         <div class="flex flex-col gap-[5px]">
-                            <label class="text-[10px] font-semibold text-ordo-muted" for="report-classification">Classification</label>
+                            <label class="text-xs font-semibold text-gray-600" for="report-classification">Classification</label>
                             <select id="report-classification" x-model="filters.classification"
-                                    class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                                    class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue">
                                 <option value="">All classifications</option>
                                 @foreach ($classifications as $classification)
                                     <option value="{{ $classification->code }}">{{ $classification->code }} — {{ $classification->name }}</option>
@@ -62,9 +62,9 @@
                         </div>
 
                         <div class="flex flex-col gap-[5px]">
-                            <label class="text-[10px] font-semibold text-ordo-muted" for="report-index">Index</label>
+                            <label class="text-xs font-semibold text-gray-600" for="report-index">Index</label>
                             <select id="report-index" x-model="filters.index"
-                                    class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                                    class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue">
                                 <option value="">All indexes</option>
                                 {{-- Server-rendered so the options exist before any
                                      JavaScript runs; the builder narrows this list
@@ -76,9 +76,9 @@
                         </div>
 
                         <div class="flex flex-col gap-[5px]">
-                            <label class="text-[10px] font-semibold text-ordo-muted" for="report-source">Source</label>
+                            <label class="text-xs font-semibold text-gray-600" for="report-source">Source</label>
                             <select id="report-source" x-model="filters.source"
-                                    class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                                    class="rounded-lg border border-ordo-line bg-white px-3 py-2 text-xs md:text-sm outline-none focus:border-ordo-blue">
                                 <option value="">All sources</option>
                                 @foreach ($sources as $source)
                                     <option value="{{ $source->name }}">{{ $source->name }}</option>
@@ -87,7 +87,7 @@
                         </div>
 
                         <div class="flex flex-col gap-[5px]">
-                            <label class="text-[10px] font-semibold text-ordo-muted" for="report-year">Document Year</label>
+                            <label class="text-xs font-semibold text-gray-600" for="report-year">Document Year</label>
                             <input id="report-year" type="number" min="1900" max="2999"
                                    x-model="filters.year" placeholder="e.g. 2026"
                                    class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
