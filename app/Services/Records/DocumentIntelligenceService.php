@@ -147,6 +147,11 @@ class DocumentIntelligenceService
                 $detectedDate = sprintf('%04d-%02d-%02d', (int) $dateMatches[3], (int) $dateMatches[1], (int) $dateMatches[2]);
             } elseif (preg_match('/\b(\d{4})[\/\-](0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])\b/', $lowerText, $dateMatches)) {
                 $detectedDate = sprintf('%04d-%02d-%02d', (int) $dateMatches[1], (int) $dateMatches[2], (int) $dateMatches[3]);
+            } elseif (preg_match('#(0?[1-9]|1[0-2])[i/\-.](0?[1-9]|[12]\d|3[01])[i/\-.~]([~2\d][\d.]{2,4})#', $lowerText, $dateMatches)) {
+                $yearDigits = preg_replace('/[^\d]/', '', str_replace('~', '2', $dateMatches[3]));
+                if (strlen($yearDigits) === 4) {
+                    $detectedDate = sprintf('%04d-%02d-%02d', (int) $yearDigits, (int) $dateMatches[1], (int) $dateMatches[2]);
+                }
             }
         }
 

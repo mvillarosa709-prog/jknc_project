@@ -2269,6 +2269,15 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
                 if (ymd) {
                     const [, y, m, d] = ymd;
                     this.form.document_date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                } else {
+                    const fuzzyOcr = textToAnalyze.match(/(0?[1-9]|1[0-2])[i/\-.](0?[1-9]|[12]\d|3[01])[i/\-.~]([~2\d][\d.]{2,4})/);
+                    if (fuzzyOcr) {
+                        const [, m, d, rawY] = fuzzyOcr;
+                        const cleanY = rawY.replace(/~/g, '2').replace(/[^\d]/g, '');
+                        if (cleanY.length === 4) {
+                            this.form.document_date = `${cleanY}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        }
+                    }
                 }
             }
         }
