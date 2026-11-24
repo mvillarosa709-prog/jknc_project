@@ -30,6 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'prevent-back-history' => \App\Http\Middleware\PreventBackHistory::class,
             'human-capital.module' => \App\Http\Middleware\HumanCapitalModuleAccess::class,
+            'ordo.context' => \App\Http\Middleware\ResolveCompanyContext::class,
+            'ordo.record' => \App\Http\Middleware\ScopedRecordLookup::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
