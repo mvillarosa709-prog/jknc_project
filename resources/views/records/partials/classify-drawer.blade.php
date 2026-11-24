@@ -323,27 +323,29 @@
                                    class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
                         </x-ordo.field>
 
-                        <x-ordo.field label="Source">
-                            <select name="source" x-model="form.source"
-                                    class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
-                                <option value="">Select source</option>
-                                @foreach ($sources as $option)
-                                    <option value="{{ $option->name }}">{{ $option->name }}</option>
-                                @endforeach
-                                <option value="Others">Others</option>
-                            </select>
-                        </x-ordo.field>
+                        <div class="flex flex-col gap-2.5">
+                            <x-ordo.field label="Source">
+                                <select name="source" x-model="form.source"
+                                        class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                                    <option value="">Select source</option>
+                                    @foreach ($sources as $option)
+                                        <option value="{{ $option->name }}">{{ $option->name }}</option>
+                                    @endforeach
+                                    <option value="Others">Others</option>
+                                </select>
+                            </x-ordo.field>
 
-                        <x-ordo.field label="Specify Source" full x-show="form.source === 'Others'" x-cloak>
-                            <input type="text" name="source_other" maxlength="255" x-model="form.source_other"
-                                   x-bind:required="form.source === 'Others'"
-                                   x-bind:aria-invalid="fieldError('source_other') ? 'true' : 'false'"
-                                   x-bind:class="fieldError('source_other') ? 'border-[#b42318]' : ''"
-                                   placeholder="Enter the source name"
-                                   class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
-                            <p x-show="fieldError('source_other')" x-cloak
-                               class="mt-1 text-[10px] text-[#b42318]" x-text="fieldError('source_other')"></p>
-                        </x-ordo.field>
+                            <x-ordo.field label="Specify Source" x-show="form.source === 'Others'" x-cloak>
+                                <input type="text" name="source_other" maxlength="255" x-model="form.source_other"
+                                       x-bind:required="form.source === 'Others'"
+                                       x-bind:aria-invalid="fieldError('source_other') ? 'true' : 'false'"
+                                       x-bind:class="fieldError('source_other') ? 'border-[#b42318]' : ''"
+                                       placeholder="Enter the source name"
+                                       class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                                <p x-show="fieldError('source_other')" x-cloak
+                                   class="mt-1 text-[10px] text-[#b42318]" x-text="fieldError('source_other')"></p>
+                            </x-ordo.field>
+                        </div>
                     </div>
 
                     {{-- Advanced Details stays collapsed until the index asks for it, and

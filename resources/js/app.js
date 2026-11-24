@@ -802,6 +802,13 @@ function documentReading() {
             this.reReadMessage = state.ocrText
                 ? ''
                 : (state.ocrError ?? 'No extracted text is available for this document yet.');
+
+            if (state.ocrText && typeof this.autoDetectFields === 'function' && this.current) {
+                if (this.current.files && this.current.files[0]) {
+                    this.current.files[0].ocrText = state.ocrText;
+                }
+                this.autoDetectFields(this.current);
+            }
         },
 
         /**
@@ -2067,7 +2074,7 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
             record_index_id: item.suggestedIndexId || '',
             title: item.title || '',
             document_date: item.documentDate || '',
-            source: Object.entries(this.sources).find(([, name]) => name === item.source)?.[0] ?? item.source ?? '',
+            source: item.source || '',
             external_reference_number: item.externalReference || '',
             retention_period: '',
             identifiers: '',
@@ -2077,8 +2084,15 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
             is_confidential: false,
         };
 
-        if (! this.form.record_classification_id || ! this.form.source) {
+        if (! this.form.record_classification_id || ! this.form.source || ! this.form.document_date) {
             this.autoDetectFields(item);
+        }
+
+        if (item.files?.[0] && (item.files[0].ocrStatus === 'queued' || item.files[0].ocrStatus === 'reading')) {
+            const urls = this.readingUrls();
+            if (urls && urls.status) {
+                this.followReading(urls.status);
+            }
         }
 
         this.open = true;
@@ -2095,6 +2109,11 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
             return;
         }
 
+        const hasWord = (word) => {
+            const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(`\\b${escaped}\\b`, 'i').test(textToAnalyze);
+        };
+
         let matchedClassId = '';
         let matchedIndexId = '';
 
@@ -2102,41 +2121,85 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
             for (const idx of (indexes || [])) {
                 const idxLabel = String(idx.label || idx.name || '').toLowerCase();
                 const idxCode = String(idx.code || '').toLowerCase();
-                if (textToAnalyze.includes(idxLabel) || (idxCode && textToAnalyze.includes(idxCode))) {
+
+                if (idxCode && hasWord(idxCode)) {
                     matchedClassId = String(classId);
                     matchedIndexId = String(idx.id);
                     break;
                 }
-                if (idxLabel.includes('resolution') && textToAnalyze.includes('resolution')) {
+
+                if ((idxLabel.includes('2303') || idxLabel.includes('form 2303')) &&
+                    (hasWord('2303') || textToAnalyze.includes('certificate of registration'))) {
                     matchedClassId = String(classId);
                     matchedIndexId = String(idx.id);
                     break;
                 }
-                if (idxLabel.includes('minutes') && textToAnalyze.includes('minutes')) {
+
+                if ((idxLabel.includes('2307') || idxLabel.includes('form 2307')) &&
+                    (hasWord('2307') || textToAnalyze.includes('creditable tax') || textToAnalyze.includes('withholding tax'))) {
                     matchedClassId = String(classId);
                     matchedIndexId = String(idx.id);
                     break;
                 }
-                if ((idxLabel.includes('gis') || idxLabel.includes('general information sheet')) &&
-                    (textToAnalyze.includes('gis') || textToAnalyze.includes('general information sheet'))) {
+
+                if (idxLabel.includes('1601') && (hasWord('1601c') || hasWord('1601-c'))) {
                     matchedClassId = String(classId);
                     matchedIndexId = String(idx.id);
                     break;
                 }
-                if ((idxLabel.includes('2303') || idxLabel.includes('registration')) &&
-                    (textToAnalyze.includes('2303') || textToAnalyze.includes('registration'))) {
+
+                if (idxLabel.includes('gis') && (hasWord('gis') || textToAnalyze.includes('general information sheet'))) {
                     matchedClassId = String(classId);
                     matchedIndexId = String(idx.id);
                     break;
                 }
-                if ((idxLabel.includes('2307') || idxLabel.includes('withholding')) &&
-                    (textToAnalyze.includes('2307') || textToAnalyze.includes('withholding'))) {
+
+                if (idxLabel.includes('resolution') && (textToAnalyze.includes('board resolution') || textToAnalyze.includes('trustees resolution'))) {
                     matchedClassId = String(classId);
                     matchedIndexId = String(idx.id);
                     break;
                 }
+
+                if (idxLabel.includes('minutes') && (textToAnalyze.includes('board minutes') || textToAnalyze.includes('minutes of'))) {
+                    matchedClassId = String(classId);
+                    matchedIndexId = String(idx.id);
+                    break;
+                }
+
+                if ((idxLabel.includes('articles') || idxLabel.includes('incorporation')) &&
+                    (textToAnalyze.includes('articles of incorporation') || textToAnalyze.includes('by-laws') || hasWord('incorporation'))) {
+                    matchedClassId = String(classId);
+                    matchedIndexId = String(idx.id);
+                    break;
+                }
+
+                if ((idxLabel.includes('sec cert') || idxLabel.includes('secretary')) &&
+                    (textToAnalyze.includes('secretary certificate') || textToAnalyze.includes("secretary's certificate") || hasWord('sec cert'))) {
+                    matchedClassId = String(classId);
+                    matchedIndexId = String(idx.id);
+                    break;
+                }
+
+                if (idxLabel.includes('bank') && (hasWord('bank') || textToAnalyze.includes('bank statement') || textToAnalyze.includes('bank account'))) {
+                    matchedClassId = String(classId);
+                    matchedIndexId = String(idx.id);
+                    break;
+                }
+
+                if (idxLabel.includes('contract') && hasWord('contract')) {
+                    matchedClassId = String(classId);
+                    matchedIndexId = String(idx.id);
+                    break;
+                }
+
+                if (idxLabel.includes('agreement') && hasWord('agreement')) {
+                    matchedClassId = String(classId);
+                    matchedIndexId = String(idx.id);
+                    break;
+                }
+
                 if ((idxLabel.includes('operation') || idxLabel.includes('delivery')) &&
-                    (textToAnalyze.includes('operation') || textToAnalyze.includes('delivery'))) {
+                    (hasWord('operation') || hasWord('operations') || textToAnalyze.includes('delivery receipt') || textToAnalyze.includes('work order'))) {
                     matchedClassId = String(classId);
                     matchedIndexId = String(idx.id);
                     break;
@@ -2148,10 +2211,11 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
         if (! matchedClassId) {
             for (const [classId, className] of Object.entries(this.classifications || {})) {
                 const nameLower = String(className).toLowerCase();
-                if (textToAnalyze.includes(nameLower) ||
-                    (nameLower.includes('operation') && textToAnalyze.includes('operation')) ||
-                    (nameLower.includes('bank') && textToAnalyze.includes('bank')) ||
-                    (nameLower.includes('entity') && (textToAnalyze.includes('board') || textToAnalyze.includes('incorporation') || textToAnalyze.includes('resolution')))) {
+                if (hasWord(nameLower) ||
+                    (nameLower.includes('tax') && (hasWord('bir') || hasWord('tax') || hasWord('2303') || hasWord('2307'))) ||
+                    (nameLower.includes('entity') && (textToAnalyze.includes('board resolution') || textToAnalyze.includes('incorporation') || hasWord('gis'))) ||
+                    (nameLower.includes('banking') && hasWord('bank')) ||
+                    (nameLower.includes('legal') && (hasWord('contract') || hasWord('agreement')))) {
                     matchedClassId = String(classId);
                     const indexes = this.indexesByClassification[classId] || [];
                     if (indexes.length > 0) {
@@ -2170,26 +2234,42 @@ Alpine.data('classifyDrawer', (items, classifications, indexesByClassification, 
         }
 
         if (! this.form.source) {
-            let matchedSourceKey = '';
             let targetSourceName = '';
-            if (textToAnalyze.includes('board') || textToAnalyze.includes('resolution') || textToAnalyze.includes('directors')) {
+            if (hasWord('bir') || hasWord('tax') || hasWord('2303') || hasWord('2307') || textToAnalyze.includes('revenue') || textToAnalyze.includes('bureau of internal revenue')) {
+                targetSourceName = 'Bureau of Internal Revenue';
+            } else if (hasWord('sec') || hasWord('gis') || textToAnalyze.includes('securities and exchange') || textToAnalyze.includes('general information sheet') || textToAnalyze.includes('incorporation')) {
+                targetSourceName = 'Securities and Exchange Commission';
+            } else if (textToAnalyze.includes('board resolution') || textToAnalyze.includes('board of directors') || hasWord('directors')) {
+                targetSourceName = 'Board of Directors';
+            } else if (textToAnalyze.includes('corporate secretary') || hasWord('sec cert')) {
                 targetSourceName = 'Corporate Secretary';
-            } else if (textToAnalyze.includes('sec') || textToAnalyze.includes('gis') || textToAnalyze.includes('incorporation')) {
-                targetSourceName = 'SEC';
-            } else if (textToAnalyze.includes('bir') || textToAnalyze.includes('2303') || textToAnalyze.includes('2307') || textToAnalyze.includes('tax')) {
-                targetSourceName = 'BIR';
-            } else if (textToAnalyze.includes('bank')) {
-                targetSourceName = 'Bank';
-            } else if (textToAnalyze.includes('operation') || textToAnalyze.includes('delivery')) {
-                targetSourceName = 'Internal Operations';
-            } else if (textToAnalyze.includes('client')) {
-                targetSourceName = 'Client';
+            } else if (hasWord('rcbc')) {
+                targetSourceName = 'RCBC';
+            } else if (hasWord('bdo')) {
+                targetSourceName = 'BDO';
+            } else if (hasWord('operation') || hasWord('operations') || textToAnalyze.includes('delivery')) {
+                targetSourceName = 'Management';
+            } else if (hasWord('client') || hasWord('customer') || hasWord('supplier')) {
+                targetSourceName = 'Supplier';
             }
 
             if (targetSourceName) {
                 const found = Object.entries(this.sources).find(([, name]) => String(name).toLowerCase() === targetSourceName.toLowerCase());
-                matchedSourceKey = found ? found[0] : targetSourceName;
-                this.form.source = matchedSourceKey;
+                this.form.source = found ? found[1] : targetSourceName;
+            }
+        }
+
+        if (! this.form.document_date) {
+            const mdy = textToAnalyze.match(/\b(0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])[\/\-](\d{4})\b/);
+            if (mdy) {
+                const [, m, d, y] = mdy;
+                this.form.document_date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            } else {
+                const ymd = textToAnalyze.match(/\b(\d{4})[\/\-](0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])\b/);
+                if (ymd) {
+                    const [, y, m, d] = ymd;
+                    this.form.document_date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                }
             }
         }
     },
