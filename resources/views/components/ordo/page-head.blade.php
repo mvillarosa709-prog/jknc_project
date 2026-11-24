@@ -14,12 +14,12 @@
 --}}
 @props(['title', 'subtitle' => null])
 
-<div {{ $attributes->merge(['class' => 'flex items-start justify-between gap-4 border-b border-ordo-line px-5 py-4.5']) }}>
+<div {{ $attributes->merge(['class' => 'flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 bg-white']) }}>
     <div class="min-w-0">
-        <h1 class="mb-1 text-xl font-bold text-gray-900">{{ $title }}</h1>
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-gray-900 leading-snug">{{ $title }}</h1>
 
         @if ($subtitle)
-            <p class="text-xs md:text-sm text-gray-500">{{ $subtitle }}</p>
+            <p class="text-xs md:text-sm text-gray-500 mt-1 leading-relaxed">{{ $subtitle }}</p>
         @endif
     </div>
 

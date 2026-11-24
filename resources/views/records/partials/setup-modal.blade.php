@@ -25,8 +25,11 @@
              x-show="open" x-cloak>
 
             {{-- ============ HEAD ============ --}}
-            <div class="flex shrink-0 items-start justify-between border-b border-ordo-line px-4 py-3.5">
-                <h3 id="records-setup-title" class="m-0 text-[14px] font-bold">Records Management Setup</h3>
+            <div class="flex shrink-0 items-start justify-between border-b border-gray-200 px-5 py-4 bg-white">
+                <div>
+                    <h3 id="records-setup-title" class="m-0 text-base md:text-lg font-bold text-gray-900">Records Management Setup</h3>
+                    <p class="mt-0.5 mb-0 text-xs text-gray-500">Configure classification schemes, sources, numbering, and integration settings.</p>
+                </div>
                 <button type="button"
                         class="-mr-1 flex h-7 w-7 items-center justify-center rounded-lg border-0 bg-transparent text-[20px] leading-none text-ordo-muted transition-colors hover:bg-[#f3f4f6] focus:outline-none focus-visible:ring-2 focus-visible:ring-ordo-blue"
                         x-on:click="close()" aria-label="Close">&times;</button>

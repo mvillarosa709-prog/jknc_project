@@ -35,15 +35,13 @@
                  font-family on .class-row. The monospace face is reserved for
                  the Document Reference chip, which is where the mock does use
                  it. --}}
-            <div class="grid grid-cols-[90px_1fr_120px_90px] items-center gap-2.5 border-b border-ordo-line bg-[#fbfcfe] px-3 py-2.5 font-bold max-[640px]:grid-cols-1">
-                <span class="text-[16px] text-ordo-ink">{{ $classification->code }}</span>
+            <div class="grid grid-cols-[90px_1fr_120px_90px] md:grid-cols-[90px_1fr_100px_auto] items-center gap-2.5 border-b border-ordo-line bg-[#fbfcfe] px-3.5 py-3 font-bold max-[640px]:grid-cols-1">
+                <span class="text-[15px] font-bold text-gray-900">{{ $classification->code }}</span>
 
                 <div class="min-w-0">
-                    <span class="text-[16px]">{{ $classification->name }}</span>
+                    <span class="text-[15px] font-bold text-gray-900">{{ $classification->name }}</span>
                     @if ($classification->description)
-                        {{-- Weight is reset here: the parent row is bold, but a
-                             description set in bold reads as a second heading. --}}
-                        <div class="mt-0.5 font-normal text-[10px] leading-[1.5] text-[#6b7280]">
+                        <div class="mt-0.5 font-normal text-xs leading-relaxed text-gray-500">
                             {{ $classification->description }}
                         </div>
                     @endif
@@ -53,8 +51,20 @@
                     {{ $classification->is_active ? 'Active' : 'Inactive' }}
                 </x-ordo.pill>
 
-                <div class="text-right">
+                <div class="flex items-center justify-end gap-2 text-right">
                     @if ($canManage)
+                        <button type="button"
+                                x-on:click="openEditClassification({
+                                    id: @js($classification->id),
+                                    code: @js($classification->code),
+                                    name: @js($classification->name),
+                                    description: @js($classification->description ?? ''),
+                                    is_active: @js($classification->is_active ? 1 : 0)
+                                })"
+                                class="border-0 bg-transparent p-0 text-[11px] text-ordo-blue transition-opacity hover:opacity-75">
+                            Edit
+                        </button>
+                        <span class="text-gray-300">|</span>
                         <button type="button"
                                 x-on:click="open('index', @js($classification->code))"
                                 class="border-0 bg-transparent p-0 text-[11px] text-ordo-blue transition-opacity hover:opacity-75">
@@ -64,17 +74,16 @@
                 </div>
             </div>
 
-            {{-- Children: the Indexes beneath it. Same 16px as the Classification
-                     above and the same proportional code — one scheme, one
-                     scale. --}}
+            {{-- Children: the Indexes beneath it. Same scale as the Classification
+                     above — one scheme, one scale. --}}
             @forelse ($classification->indexes as $index)
-                <div class="grid grid-cols-[90px_1fr_120px_90px] items-center gap-2.5 border-b border-ordo-line px-3 py-2.5 pl-[36px] max-[640px]:grid-cols-1 max-[640px]:pl-3">
-                    <span class="text-[16px] text-ordo-ink">{{ $index->code }}</span>
+                <div class="grid grid-cols-[90px_1fr_120px_90px] md:grid-cols-[90px_1fr_100px_auto] items-center gap-2.5 border-b border-gray-100 px-3.5 py-2.5 pl-[38px] max-[640px]:grid-cols-1 max-[640px]:pl-3.5">
+                    <span class="text-[14px] font-semibold text-gray-800">{{ $index->code }}</span>
 
                     <div class="min-w-0">
-                        <span class="text-[16px]">{{ $index->name }}</span>
+                        <span class="text-[14px] font-semibold text-gray-800">{{ $index->name }}</span>
                         @if ($index->description)
-                            <div class="mt-0.5 text-[10px] leading-[1.5] text-[#6b7280]">
+                            <div class="mt-0.5 text-xs leading-relaxed text-gray-500">
                                 {{ $index->description }}
                             </div>
                         @endif
@@ -84,7 +93,24 @@
                         {{ $index->is_active ? 'Active' : 'Inactive' }}
                     </x-ordo.pill>
 
-                    <div class="text-right">
+                    <div class="flex items-center justify-end gap-2 text-right">
+                        @if ($canManage)
+                            <button type="button"
+                                    x-on:click="openEditIndex({
+                                        id: @js($index->id),
+                                        classification_code: @js($classification->code),
+                                        code: @js($index->code),
+                                        name: @js($index->name),
+                                        description: @js($index->description ?? ''),
+                                        is_active: @js($index->is_active ? 1 : 0),
+                                        advanced_field_config: @js($index->advanced_field_config)
+                                    })"
+                                    class="border-0 bg-transparent p-0 text-[11px] text-ordo-blue transition-opacity hover:opacity-75">
+                                Edit
+                            </button>
+                            <span class="text-gray-300">|</span>
+                        @endif
+
                         <a href="{{ route('records.index', ['classification' => $classification->code, 'index' => $index->code]) }}"
                            class="text-[11px] text-ordo-blue transition-opacity hover:opacity-75">View Records</a>
                     </div>

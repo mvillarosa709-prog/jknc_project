@@ -19,7 +19,7 @@ class RecordClassificationPolicy
 
     public function viewAny(?object $user): bool
     {
-        return $user !== null && UserRole::for($user)->canView();
+        return UserRole::for($user)->canView();
     }
 
     /**
@@ -30,7 +30,12 @@ class RecordClassificationPolicy
      */
     public function create(?object $user): bool
     {
-        return $user !== null && $this->hasContext() && UserRole::for($user)->canManageScheme();
+        return $this->hasContext() && UserRole::for($user)->canManageScheme();
+    }
+
+    public function update(?object $user): bool
+    {
+        return $this->create($user);
     }
 
     /**

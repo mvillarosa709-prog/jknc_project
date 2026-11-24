@@ -5,14 +5,13 @@ namespace App\Http\Controllers\Records;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreClassificationRequest;
 use App\Http\Requests\StoreIndexRequest;
-use App\Http\Requests\UpdateClassificationRequest;
-use App\Http\Requests\UpdateIndexRequest;
 use App\Models\RecordClassification;
 use App\Models\RecordIndex;
 use App\Services\CompanyContext;
 use App\Services\Records\RecordLookups;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
@@ -128,46 +127,89 @@ class RecordClassificationController extends Controller
             ->with('status', sprintf('Index %s was added under %s.', $request->input('code'), $parent->code));
     }
 
-    public function updateClassification(UpdateClassificationRequest $request, string $id): RedirectResponse
+    public function updateClassification(Request $request, string $classification): RedirectResponse
     {
-        $classification = RecordClassification::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('company_id', $request->companyId())
-            ->where('id', $id)
+        Gate::authorize('create', RecordClassification::class);
+
+        $tenantId = $this->context->tenantId();
+        $companyId = $this->context->id();
+
+        $recordClassification = RecordClassification::query()
+            ->where('tenant_id', $tenantId)
+            ->where('company_id', $companyId)
+            ->where(function ($q) use ($classification) {
+                $q->where('code', $classification)->orWhere('id', $classification);
+            })
             ->firstOrFail();
 
-        $classification->update([
-            'code' => trim((string) $request->input('code')),
-            'name' => trim((string) $request->input('name')),
-            'description' => $request->input('description'),
-            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'is_active' => ['nullable'],
+        ]);
+
+        $recordClassification->update([
+            'name' => trim($validated['name']),
+            'description' => $validated['description'] ?? null,
+            'is_active' => $request->boolean('is_active', true),
         ]);
 
         $this->forgetLookups();
 
         return back()
-            ->with('status', sprintf('Classification %s was updated.', $classification->code));
+            ->with('setup_tab', 'classifications')
+            ->with('status', sprintf('Classification %s was updated.', $recordClassification->code));
     }
 
-    public function updateIndex(UpdateIndexRequest $request, string $id): RedirectResponse
+    public function updateIndex(Request $request, string $classification, string $index): RedirectResponse
     {
-        $index = RecordIndex::query()
-            ->where('tenant_id', $request->tenantId())
-            ->where('company_id', $request->companyId())
-            ->where('id', $id)
+        Gate::authorize('create', RecordClassification::class);
+
+        $tenantId = $this->context->tenantId();
+        $companyId = $this->context->id();
+
+        $recordClassification = RecordClassification::query()
+            ->where('tenant_id', $tenantId)
+            ->where('company_id', $companyId)
+            ->where(function ($q) use ($classification) {
+                $q->where('code', $classification)->orWhere('id', $classification);
+            })
             ->firstOrFail();
 
-        $index->update([
-            'code' => trim((string) $request->input('code')),
-            'name' => trim((string) $request->input('name')),
-            'description' => $request->input('description'),
-            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+        $recordIndex = RecordIndex::query()
+            ->where('tenant_id', $tenantId)
+            ->where('company_id', $companyId)
+            ->where('record_classification_id', $recordClassification->getKey())
+            ->where(function ($q) use ($index) {
+                $q->where('code', $index)->orWhere('id', $index);
+            })
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'is_active' => ['nullable'],
+            'sections' => ['nullable', 'array'],
+        ]);
+
+        $advancedConfig = null;
+        if ($request->has('sections')) {
+            $sections = array_values(array_filter((array) $request->input('sections', [])));
+            $advancedConfig = !empty($sections) ? ['sections' => $sections] : null;
+        }
+
+        $recordIndex->update([
+            'name' => trim($validated['name']),
+            'description' => $validated['description'] ?? null,
+            'is_active' => $request->boolean('is_active', true),
+            'advanced_field_config' => $advancedConfig,
         ]);
 
         $this->forgetLookups();
 
         return back()
-            ->with('status', sprintf('Index %s was updated.', $index->code));
+            ->with('setup_tab', 'classifications')
+            ->with('status', sprintf('Index %s was updated.', $recordIndex->code));
     }
 
     /**

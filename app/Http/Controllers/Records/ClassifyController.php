@@ -163,34 +163,18 @@ class ClassifyController extends Controller
             ->orderBy('created_at')
             ->orderBy('id')
             ->get()
-            ->map(function (RecordIntakeItem $item): array {
-                $suggestedClass = (string) ($item->suggested_classification_id ?? '');
-                $suggestedIdx = (string) ($item->suggested_index_id ?? '');
-                $source = $item->source;
-
-                if ($suggestedClass === '' || blank($source)) {
-                    $detected = app(\App\Services\Records\DocumentIntelligenceService::class)->detect($item);
-                    if ($suggestedClass === '' && ! empty($detected['classification_id'])) {
-                        $suggestedClass = (string) $detected['classification_id'];
-                        $suggestedIdx = (string) ($detected['index_id'] ?? '');
-                    }
-                    if (blank($source) && ! empty($detected['source'])) {
-                        $source = (string) $detected['source'];
-                    }
-                }
-
-                return [
-                    'id' => (string) $item->id,
-                    'title' => $item->title,
-                    'source' => $source,
-                    'documentDate' => $item->document_date?->format('Y-m-d'),
-                    'externalReference' => $item->external_reference_number,
-                    'storageBytes' => (int) $item->storage_bytes,
-                    'status' => $item->status->value,
-                    'statusLabel' => $item->status->label(),
-                    'suggestedClassificationId' => $suggestedClass,
-                    'suggestedIndexId' => $suggestedIdx,
-                    'files' => $item->files->map(fn ($file): array => [
+            ->map(fn (RecordIntakeItem $item): array => [
+                'id' => (string) $item->id,
+                'title' => $item->title,
+                'source' => $item->source,
+                'documentDate' => $item->document_date?->format('Y-m-d'),
+                'externalReference' => $item->external_reference_number,
+                'storageBytes' => (int) $item->storage_bytes,
+                'status' => $item->status->value,
+                'statusLabel' => $item->status->label(),
+                'suggestedClassificationId' => (string) ($item->suggested_classification_id ?? ''),
+                'suggestedIndexId' => (string) ($item->suggested_index_id ?? ''),
+                'files' => $item->files->map(fn ($file): array => [
                     'id' => (string) $file->id,
                     'name' => $file->original_name,
                     'mimeType' => $file->mime_type,
@@ -223,9 +207,8 @@ class ClassifyController extends Controller
                     'renderedUrl' => $file->canRenderAsHtml()
                         ? route('records.files.rendered', ['file' => $file->id])
                         : null,
-                    ])->all(),
-                ];
-            })
+                ])->all(),
+            ])
             ->all();
     }
 

@@ -4,11 +4,11 @@
     $base = 'inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
     $variants = [
-        'default' => 'border-ordo-line bg-ordo-panel text-[#374151] hover:bg-[#f9fafb]',
-        'primary' => 'border-ordo-blue bg-ordo-blue text-white hover:bg-[#2559d6]',
-        'soft' => 'border-[#d7e5ff] bg-[#eef4ff] text-ordo-blue hover:bg-[#e5eeff]',
-        'danger' => 'border-[#f4cccc] bg-[#fff8f8] text-[#b42318] hover:bg-[#fff0f0]',
-        'success' => 'border-[#cdecdc] bg-[#f3fbf7] text-[#11734b] hover:bg-[#e9f7f0]',
+        'default' => 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 shadow-sm font-medium',
+        'primary' => 'border-[#2563eb] bg-[#2563eb] text-white hover:bg-[#1d4ed8] shadow-sm font-semibold',
+        'soft' => 'border-[#d7e5ff] bg-[#eef4ff] text-[#2563eb] hover:bg-[#e5eeff] font-medium',
+        'danger' => 'border-[#f4cccc] bg-[#fff8f8] text-[#b42318] hover:bg-[#fff0f0] font-medium',
+        'success' => 'border-[#cdecdc] bg-[#f3fbf7] text-[#11734b] hover:bg-[#e9f7f0] font-medium',
         // The setup gear. A square variant rather than a new component, so it
         // keeps the same border, radius and focus behaviour as every other button.
         //

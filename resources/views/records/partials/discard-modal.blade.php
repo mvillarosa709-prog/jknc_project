@@ -13,10 +13,10 @@
                 @csrf
                 @method('DELETE')
 
-                <div class="flex items-start justify-between border-b border-ordo-line px-4 py-3.5">
+                <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4 bg-gray-50">
                     <div>
-                        <h3 id="discard-intake-title" class="m-0 text-[14px] font-bold">Discard Unclassified Record</h3>
-                        <p class="mt-1 mb-0 text-[10px] text-ordo-muted">
+                        <h3 id="discard-intake-title" class="m-0 text-base font-bold text-gray-900">Discard Unclassified Record</h3>
+                        <p class="mt-1 mb-0 text-xs text-gray-500">
                             The record leaves the staging queue and can no longer be classified or filed.
                         </p>
                     </div>

@@ -16,10 +16,10 @@
          x-on:click.self="close()">
         <div class="w-full max-w-[560px] overflow-hidden rounded-xl bg-white shadow-[0_20px_60px_rgba(15,23,42,.22)]"
              role="dialog" aria-modal="true" aria-labelledby="camera-capture-title">
-            <div class="flex items-start justify-between border-b border-ordo-line px-4 py-3.5">
+            <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4 bg-gray-50">
                 <div>
-                    <h3 id="camera-capture-title" class="m-0 text-[14px] font-bold">Capture Document</h3>
-                    <p class="mt-1 mb-0 text-[10px] text-ordo-muted">
+                    <h3 id="camera-capture-title" class="m-0 text-base font-bold text-gray-900">Capture Document</h3>
+                    <p class="mt-1 mb-0 text-xs text-gray-500">
                         Photograph a document to add it to Unclassified Records.
                     </p>
                 </div>

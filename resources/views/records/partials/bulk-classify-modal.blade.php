@@ -22,10 +22,10 @@
             <form method="POST" action="{{ route('records.unclassified.bulk') }}">
                 @csrf
 
-                <div class="flex items-start justify-between border-b border-ordo-line px-4 py-3.5">
+                <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4 bg-gray-50">
                     <div>
-                        <h3 id="bulk-classify-title" class="m-0 text-[14px] font-bold">Bulk Classify</h3>
-                        <p class="mt-1 mb-0 text-[10px] text-ordo-muted">
+                        <h3 id="bulk-classify-title" class="m-0 text-base font-bold text-gray-900">Bulk Classify</h3>
+                        <p class="mt-1 mb-0 text-xs text-gray-500">
                             Applies one Classification and Index to every selected record. Each filed record
                             receives its own Document Reference and uses 1 Record Unit.
                         </p>

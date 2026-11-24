@@ -1,4 +1,3 @@
-import './bootstrap';
 import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
@@ -1677,19 +1676,43 @@ Alpine.data('classificationBrowser', (scheme) => ({
     query: '',
     mode: null,
     parent: '',
-    // Bound as a property, not just captured by the closure. Every method below
-    // reads it back as `this.scheme`, and an argument that is only captured
-    // cannot be read that way — which made textFor() throw, which made the
-    // x-show on every scheme row evaluate falsy, which hid the whole tree while
-    // the page still reported "11 classifications" beside it.
     scheme,
+
+    // Helper state for Add Classification preset selection
+    newClassification: {
+        code: '',
+        name: '',
+        description: '',
+    },
+
+    // Edit classification state
+    editClassificationData: {
+        id: '',
+        code: '',
+        name: '',
+        description: '',
+        is_active: true,
+    },
+
+    // Edit index state
+    editIndexData: {
+        id: '',
+        classification_code: '',
+        code: '',
+        name: '',
+        description: '',
+        is_active: true,
+        advanced_field_config: null,
+        sections: {
+            identifiers: false,
+            dates: false,
+            signatories: false,
+            financials: false,
+        },
+    },
 
     /**
      * A block is visible when the term appears anywhere in its text.
-     *
-     * `text` holds the Classification's own code, name and description plus every
-     * Index beneath it, so the block is matched and hidden as a unit. That is what
-     * keeps an Index hit from leaving its parent Classification orphaned on screen.
      */
     matches(text) {
         if (this.query === '') {
@@ -1700,9 +1723,6 @@ Alpine.data('classificationBrowser', (scheme) => ({
     },
 
     textFor(code) {
-        // Falls back to an empty block rather than throwing. A search that cannot
-        // resolve a code should show everything; one that throws shows nothing,
-        // which turns a small mistake into a blank page.
         return (this.scheme ?? []).find((entry) => entry.code === code)?.text ?? '';
     },
 
@@ -1711,26 +1731,90 @@ Alpine.data('classificationBrowser', (scheme) => ({
     },
 
     get visibleCount() {
-        return this.scheme.filter((entry) => this.matches(entry.text)).length;
+        return (this.scheme ?? []).filter((entry) => this.matches(entry.text)).length;
     },
 
     open(mode, parent = '') {
         this.mode = mode;
         this.parent = parent;
+        if (mode === 'classification') {
+            this.newClassification = { code: '', name: '', description: '' };
+        }
+    },
+
+    openEditClassification(data) {
+        this.editClassificationData = {
+            id: data.id || '',
+            code: data.code || '',
+            name: data.name || '',
+            description: data.description || '',
+            is_active: Boolean(data.is_active),
+        };
+        this.mode = 'edit_classification';
+    },
+
+    openEditIndex(data) {
+        let sec = { identifiers: false, dates: false, signatories: false, financials: false };
+        if (data.advanced_field_config) {
+            if (Array.isArray(data.advanced_field_config.sections)) {
+                data.advanced_field_config.sections.forEach(s => sec[s] = true);
+            } else if (data.advanced_field_config === true) {
+                sec = { identifiers: true, dates: true, signatories: true, financials: true };
+            }
+        }
+        this.editIndexData = {
+            id: data.id || '',
+            classification_code: data.classification_code || '',
+            code: data.code || '',
+            name: data.name || '',
+            description: data.description || '',
+            is_active: Boolean(data.is_active),
+            sections: sec,
+        };
+        this.mode = 'edit_index';
+    },
+
+    selectStandardScheme(code) {
+        const presets = {
+            '101': { code: '101', name: 'Client Master File', description: 'Client master file and general client correspondence.' },
+            '201': { code: '201', name: 'Human Resources & Personnel', description: 'Employment memos, personnel notices, employee records.' },
+            '301': { code: '301', name: 'Entity & Ownership', description: 'Corporate entity documents, incorporation, GIS, minutes, board resolutions.' },
+            '401': { code: '401', name: 'BIR & Tax', description: 'BIR registrations, tax returns, assessments, Form 2303, Form 2307.' },
+            '601': { code: '601', name: 'Regulatory & Compliance', description: 'Permits, licenses, regulatory registrations and local government compliance.' },
+            '701': { code: '701', name: 'Finance', description: 'Financial statements, audits, management accounts, budgets.' },
+            '801': { code: '801', name: 'Banking', description: 'Bank statements, signatory cards, loan documents, banking agreements.' },
+            '901': { code: '901', name: 'Legal', description: 'Contracts, agreements, litigation records, legal opinions.' },
+            '1001': { code: '1001', name: 'Operations', description: 'Operational policies, procedures, SOP records, document control.' },
+            '1101': { code: '1101', name: 'Real Property Records', description: 'Property ownership, land titles, technical and cadastral records.' },
+            '2001': { code: '2001', name: 'Correspondence', description: 'Official written communications, memoranda, letters.' },
+        };
+        if (presets[code]) {
+            this.newClassification.code = presets[code].code;
+            this.newClassification.name = presets[code].name;
+            this.newClassification.description = presets[code].description;
+        }
     },
 
     close() {
         this.mode = null;
     },
 
-    /**
-     * The Add Index form is built from the parent code rather than a route
-     * rendered per row, so one copy of the modal serves the whole tree.
-     */
     indexAction() {
         const base = document.querySelector('base')?.getAttribute('href') ?? '/';
-
         return `${base.replace(/\/$/, '')}/records/classifications/${encodeURIComponent(this.parent)}/indexes`;
+    },
+
+    updateClassificationAction() {
+        const base = document.querySelector('base')?.getAttribute('href') ?? '/';
+        const target = this.editClassificationData.code || this.editClassificationData.id;
+        return `${base.replace(/\/$/, '')}/records/classifications/${encodeURIComponent(target)}/update`;
+    },
+
+    updateIndexAction() {
+        const base = document.querySelector('base')?.getAttribute('href') ?? '/';
+        const parent = this.editIndexData.classification_code;
+        const target = this.editIndexData.code || this.editIndexData.id;
+        return `${base.replace(/\/$/, '')}/records/classifications/${encodeURIComponent(parent)}/indexes/${encodeURIComponent(target)}/update`;
     },
 }));
 
