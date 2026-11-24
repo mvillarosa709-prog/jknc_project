@@ -43,7 +43,7 @@
     </style>
 
     @if(file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
     @stack('styles')
 </head>
@@ -1486,9 +1486,19 @@
         <!-- MAIN CONTENT -->
         <main class="flex-1 min-w-0 overflow-y-auto">
             @yield('content')
+            {{ $slot ?? '' }}
         </main>
 
     </div>
+
+    @if(request()->routeIs('records*'))
+        @php
+            $setupTabUrl = route('records.setup.tab', ['tab' => '__TAB__']);
+            $setupInitialTab = session('setup_tab', 'classifications');
+            $setupInitiallyOpen = session()->has('setup_tab');
+        @endphp
+        @include('records.partials.setup-modal')
+    @endif
 
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
