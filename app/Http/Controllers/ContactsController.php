@@ -625,6 +625,31 @@ class ContactsController extends Controller
 
         $contactModel->update($this->filterPersistableContactAttributes($attributes));
 
+        $cifData = $this->loadCifData($contactModel);
+        if (filled($contactModel->first_name)) {
+            $cifData['first_name'] = $contactModel->first_name;
+        }
+        if (array_key_exists('middle_name', $attributes)) {
+            $cifData['middle_name'] = $contactModel->middle_name;
+        }
+        if (filled($contactModel->last_name)) {
+            $cifData['last_name'] = $contactModel->last_name;
+        }
+        if (array_key_exists('name_extension', $attributes)) {
+            $cifData['name_extension'] = $contactModel->name_extension;
+        }
+        if (filled($contactModel->contact_address)) {
+            $cifData['present_address_line1'] = $contactModel->contact_address;
+        }
+        if (filled($contactModel->email)) {
+            $cifData['email'] = $contactModel->email;
+        }
+        if (filled($contactModel->phone)) {
+            $cifData['mobile'] = $contactModel->phone;
+        }
+        $cifData['sig_name_left'] = $this->contactPrintedName($contactModel);
+        $this->saveCifDataToStorage($contactModel, $cifData);
+
         ContactHistoryLogger::log($contactModel->id, [
             'type' => 'profile',
             'title' => 'Contact profile updated',
@@ -919,7 +944,7 @@ class ContactsController extends Controller
             'sig_position_left.required' => 'Please enter your position in the acknowledgment section.',
         ]);
 
-        $validated = $this->validatedCifPayload($request);
+        $validated = $this->validatedCifPayload($request, $contact);
 
         $this->saveCifDataToStorage($contact, [
             ...$this->loadClientCifData($contact),
@@ -1149,7 +1174,7 @@ class ContactsController extends Controller
 
         $validated = $request->validate([
             'cif_date' => ['nullable', 'date'],
-            'cif_no' => ['nullable', 'string', 'max:100'],
+            'cif_no' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rule::unique('contacts', 'cif_no')->ignore($contactModel->id)],
             'is_new_client' => ['nullable', 'boolean'],
             'is_existing_client' => ['nullable', 'boolean'],
             'is_change_information' => ['nullable', 'boolean'],
@@ -2300,10 +2325,10 @@ class ContactsController extends Controller
         ];
 
         foreach ($contactBackedFields as $key => $value) {
-            if (filled($value)) {
-                $cifData[$key] = $value;
-            } elseif (array_key_exists($key, $cifData)) {
-                $cifData[$key] = is_string($cifData[$key]) ? '' : null;
+            if (! array_key_exists($key, $cifData) || blank($cifData[$key])) {
+                if (filled($value)) {
+                    $cifData[$key] = $value;
+                }
             }
         }
 
@@ -2322,18 +2347,18 @@ class ContactsController extends Controller
     private function syncContactFromCifPayload(Contact $contact, array $validated): void
     {
         $contactUpdates = $this->filterPersistableContactAttributes([
-            'first_name' => $validated['first_name'] ?? $contact->first_name,
-            'middle_name' => $validated['middle_name'] ?? $contact->middle_name,
-            'last_name' => $validated['last_name'] ?? $contact->last_name,
-            'name_extension' => $validated['name_extension'] ?? $contact->name_extension,
-            'contact_address' => $validated['present_address_line1'] ?? $contact->contact_address,
-            'date_of_birth' => $validated['date_of_birth'] ?? $contact->date_of_birth,
-            'sex' => $validated['gender'] ?? $contact->sex,
-            'nature_of_business' => $validated['nature_of_work_business'] ?? $contact->nature_of_business,
-            'tin' => $validated['tin'] ?? $contact->tin,
-            'email' => $validated['email'] ?? $contact->email,
-            'phone' => $validated['mobile'] ?? $contact->phone,
-            'owner_name' => $validated['owner_name'] ?? $contact->owner_name,
+            'first_name' => array_key_exists('first_name', $validated) ? $validated['first_name'] : $contact->first_name,
+            'middle_name' => array_key_exists('middle_name', $validated) ? $validated['middle_name'] : $contact->middle_name,
+            'last_name' => array_key_exists('last_name', $validated) ? $validated['last_name'] : $contact->last_name,
+            'name_extension' => array_key_exists('name_extension', $validated) ? $validated['name_extension'] : $contact->name_extension,
+            'contact_address' => array_key_exists('present_address_line1', $validated) ? $validated['present_address_line1'] : $contact->contact_address,
+            'date_of_birth' => array_key_exists('date_of_birth', $validated) ? $validated['date_of_birth'] : $contact->date_of_birth,
+            'sex' => array_key_exists('gender', $validated) ? $validated['gender'] : $contact->sex,
+            'nature_of_business' => array_key_exists('nature_of_work_business', $validated) ? $validated['nature_of_work_business'] : $contact->nature_of_business,
+            'tin' => array_key_exists('tin', $validated) ? $validated['tin'] : $contact->tin,
+            'email' => array_key_exists('email', $validated) ? $validated['email'] : $contact->email,
+            'phone' => array_key_exists('mobile', $validated) ? $validated['mobile'] : $contact->phone,
+            'owner_name' => array_key_exists('owner_name', $validated) ? $validated['owner_name'] : $contact->owner_name,
         ]);
 
         if ($contactUpdates !== []) {
@@ -2654,7 +2679,12 @@ class ContactsController extends Controller
         ], fn ($value) => $value !== null && $value !== '');
 
         if (! empty($payload)) {
-            $contact->forceFill($payload)->save();
+            if (isset($payload['cif_no']) && Contact::query()->where('cif_no', $payload['cif_no'])->where('id', '!=', $contact->id)->exists()) {
+                unset($payload['cif_no']);
+            }
+            if (! empty($payload)) {
+                $contact->forceFill($payload)->save();
+            }
         }
     }
 
@@ -3672,11 +3702,11 @@ class ContactsController extends Controller
         return Contact::query()->where($column, $normalizedToken)->firstOrFail();
     }
 
-    private function validatedCifPayload(Request $request): array
+    private function validatedCifPayload(Request $request, ?Contact $contact = null): array
     {
         $validated = $request->validate([
             'cif_date' => ['nullable', 'date'],
-            'cif_no' => ['nullable', 'string', 'max:100'],
+            'cif_no' => ['nullable', 'string', 'max:100', \Illuminate\Validation\Rule::unique('contacts', 'cif_no')->ignore($contact?->id)],
             'is_new_client' => ['nullable', 'boolean'],
             'is_existing_client' => ['nullable', 'boolean'],
             'is_change_information' => ['nullable', 'boolean'],
