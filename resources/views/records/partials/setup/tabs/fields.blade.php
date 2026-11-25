@@ -30,12 +30,12 @@
                 <input type="text" name="name" required
                        value="{{ old('name') }}"
                        placeholder="e.g. Client Code"
-                       class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                       class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue" />
             </x-ordo.field>
 
             <x-ordo.field label="Field Type">
                 <select name="type"
-                        class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                        class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue">
                     @foreach ($fieldTypes as $fieldType)
                         <option value="{{ $fieldType }}" @selected(old('type') === $fieldType)>{{ $fieldType }}</option>
                     @endforeach
@@ -44,7 +44,7 @@
 
             <x-ordo.field label="Filterable">
                 <select name="is_filterable"
-                        class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                        class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue">
                     <option value="0" @selected(! old('is_filterable'))>No</option>
                     <option value="1" @selected((bool) old('is_filterable'))>Yes</option>
                 </select>
@@ -55,13 +55,13 @@
     </form>
 
     <div class="overflow-x-auto rounded-xl border border-ordo-line bg-white">
-        <table class="w-full border-collapse text-[12px]">
+        <table class="w-full border-collapse text-sm">
             <thead>
-                <tr class="border-b border-ordo-line bg-[#fbfcfe] text-left">
-                    <th class="px-3 py-2.5 font-semibold text-ordo-muted">Field Name</th>
-                    <th class="px-3 py-2.5 font-semibold text-ordo-muted">Type</th>
-                    <th class="px-3 py-2.5 font-semibold text-ordo-muted">Filterable</th>
-                    <th class="px-3 py-2.5 font-semibold text-ordo-muted">Status</th>
+                <tr class="border-b border-ordo-line bg-[#fbfcfe] text-left text-xs font-semibold">
+                    <th class="px-3 py-2.5 text-ordo-muted">Field Name</th>
+                    <th class="px-3 py-2.5 text-ordo-muted">Type</th>
+                    <th class="px-3 py-2.5 text-ordo-muted">Filterable</th>
+                    <th class="px-3 py-2.5 text-ordo-muted">Status</th>
                 </tr>
             </thead>
             <tbody>

@@ -28,12 +28,12 @@
                 <input type="text" name="name" required
                        value="{{ old('name') }}"
                        placeholder="e.g. Bureau of Internal Revenue"
-                       class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                       class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue" />
             </x-ordo.field>
 
             <x-ordo.field label="Source Type">
                 <select name="type"
-                        class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                        class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue">
                     @foreach ($sourceTypes as $sourceType)
                         <option value="{{ $sourceType }}" @selected(old('type') === $sourceType)>{{ $sourceType }}</option>
                     @endforeach
@@ -45,12 +45,12 @@
     </form>
 
     <div class="overflow-x-auto rounded-xl border border-ordo-line bg-white">
-        <table class="w-full border-collapse text-[12px]">
+        <table class="w-full border-collapse text-sm">
             <thead>
-                <tr class="border-b border-ordo-line bg-[#fbfcfe] text-left">
-                    <th class="px-3 py-2.5 font-semibold text-ordo-muted">Source Name</th>
-                    <th class="px-3 py-2.5 font-semibold text-ordo-muted">Type</th>
-                    <th class="px-3 py-2.5 font-semibold text-ordo-muted">Status</th>
+                <tr class="border-b border-ordo-line bg-[#fbfcfe] text-left text-xs font-semibold">
+                    <th class="px-3 py-2.5 text-ordo-muted">Source Name</th>
+                    <th class="px-3 py-2.5 text-ordo-muted">Type</th>
+                    <th class="px-3 py-2.5 text-ordo-muted">Status</th>
                 </tr>
             </thead>
             <tbody>

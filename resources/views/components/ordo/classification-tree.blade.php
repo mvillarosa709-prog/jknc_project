@@ -15,7 +15,7 @@
     that hides a whole block when the term misses, so a Classification is never
     left on screen without the Indexes that matched.
 --}}
-@props(['classifications', 'canManage' => false])
+@props(['classifications', 'canManage' => false, 'allowEdit' => true])
 
 <div class="py-1.5">
     @forelse ($classifications as $classification)
@@ -52,7 +52,7 @@
                 </x-ordo.pill>
 
                 <div class="flex items-center justify-end gap-2 text-right">
-                    @if ($canManage)
+                    @if ($canManage && $allowEdit)
                         <button type="button"
                                 x-on:click="openEditClassification({
                                     id: @js($classification->id),
@@ -94,7 +94,7 @@
                     </x-ordo.pill>
 
                     <div class="flex items-center justify-end gap-2 text-right">
-                        @if ($canManage)
+                        @if ($canManage && $allowEdit)
                             <button type="button"
                                     x-on:click="openEditIndex({
                                         id: @js($index->id),

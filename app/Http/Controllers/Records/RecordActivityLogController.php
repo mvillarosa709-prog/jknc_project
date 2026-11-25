@@ -267,6 +267,7 @@ class RecordActivityLogController extends Controller
         return [
             'q' => trim((string) $request->query('q', '')),
             'action' => trim((string) $request->query('action', '')),
+            'date' => trim((string) $request->query('date', '')),
             'from' => trim((string) $request->query('from', '')),
             'to' => trim((string) $request->query('to', '')),
         ];
@@ -315,8 +316,9 @@ class RecordActivityLogController extends Controller
                     ->orWhere('action', 'like', '%'.$filters['q'].'%')
             ))
             ->when($filters['action'] !== '', fn (Builder $query) => $query->where('action', $filters['action']))
-            ->when($filters['from'] !== '', fn (Builder $query) => $query->where('created_at', '>=', $filters['from'].' 00:00:00'))
-            ->when($filters['to'] !== '', fn (Builder $query) => $query->where('created_at', '<=', $filters['to'].' 23:59:59'))
+            ->when(($filters['date'] ?? '') !== '', fn (Builder $query) => $query->whereDate('created_at', '=', $filters['date']))
+            ->when(($filters['from'] ?? '') !== '' && ($filters['date'] ?? '') === '', fn (Builder $query) => $query->where('created_at', '>=', $filters['from'].' 00:00:00'))
+            ->when(($filters['to'] ?? '') !== '' && ($filters['date'] ?? '') === '', fn (Builder $query) => $query->where('created_at', '<=', $filters['to'].' 23:59:59'))
             ->latest('id');
     }
 

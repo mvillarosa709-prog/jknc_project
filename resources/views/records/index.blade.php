@@ -51,30 +51,12 @@
                        aria-label="Document date"
                        class="rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
 
-                {{-- OCR text lives on the stored files, not on the record row. --}}
-                <input type="search" name="ocr" value="{{ $filters['ocr'] }}"
-                       placeholder="Search document text..."
-                       aria-label="Search extracted document text"
-                       class="min-w-[190px] rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                <button type="submit" class="rounded-lg bg-[#111827] px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#1f2937] transition-colors">Apply</button>
 
-                <input type="number" name="amount_min" value="{{ $filters['amount_min'] }}" step="0.01" min="0"
-                       placeholder="Min amount" title="Minimum amount" aria-label="Minimum amount"
-                       class="w-[112px] rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                <a href="{{ route('records.index') }}" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">Reset</a>
 
-                <input type="number" name="amount_max" value="{{ $filters['amount_max'] }}" step="0.01" min="0"
-                       placeholder="Max amount" title="Maximum amount" aria-label="Maximum amount"
-                       class="w-[112px] rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
-
-                <input type="text" name="currency" value="{{ $filters['currency'] }}" maxlength="3"
-                       placeholder="PHP" title="Currency" aria-label="Currency"
-                       class="w-[76px] rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] uppercase outline-none focus:border-ordo-blue" />
-
-                <x-ordo.button type="submit" variant="default">Apply</x-ordo.button>
-
-                <a href="{{ route('records.index') }}" class="text-[11px] text-ordo-blue">Reset</a>
-
-                <a href="{{ route('records.export', array_filter($filters)) }}">
-                    <x-ordo.button type="button" variant="default">Export CSV</x-ordo.button>
+                <a href="{{ route('records.export', array_filter($filters)) }}" class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
+                    Export CSV
                 </a>
             </form>
 

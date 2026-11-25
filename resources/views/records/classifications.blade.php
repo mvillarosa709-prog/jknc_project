@@ -19,12 +19,6 @@
                             class="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors">
                         Manage Classification
                     </button>
-
-                    <button type="button"
-                            x-on:click="open('classification')"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#1d4ed8] transition-colors">
-                        + Add Classification
-                    </button>
                 @endif
             </x-slot:actions>
         </x-ordo.page-head>
@@ -42,7 +36,7 @@
             </div>
 
             {{-- ============ THE TREE ============ --}}
-            <x-ordo.classification-tree :classifications="$classifications" :can-manage="$canManage" />
+            <x-ordo.classification-tree :classifications="$classifications" :can-manage="$canManage" :allow-edit="false" />
 
             {{-- Empty search state --}}
             <template x-if="visibleCount === 0 && query !== ''">

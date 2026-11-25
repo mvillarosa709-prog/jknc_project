@@ -20,32 +20,32 @@
     {{-- ============ STACK AND PATTERN ============ --}}
     <div class="grid gap-3 max-[980px]:grid-cols-1 lg:grid-cols-3">
         <div class="rounded-xl border border-ordo-line bg-white p-4">
-            <span class="text-[10px] uppercase tracking-[0.04em] text-ordo-faint">Current ORDO Stack</span>
-            <strong class="mt-1 block text-[12px] text-ordo-ink">Use the existing application architecture</strong>
+            <span class="text-xs uppercase tracking-[0.04em] text-ordo-faint">Current ORDO Stack</span>
+            <strong class="mt-1 block text-sm font-semibold text-ordo-ink">Use the existing application architecture</strong>
             <div class="mt-2 flex flex-wrap gap-1.5">
-                <span class="rounded-full bg-[#f3f4f6] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.04em] text-[#4b5563]">Laravel</span>
-                <span class="rounded-full bg-[#f3f4f6] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.04em] text-[#4b5563]">PHP</span>
-                <span class="rounded-full bg-[#f3f4f6] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.04em] text-[#4b5563]">MySQL</span>
+                <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] text-[#4b5563]">Laravel</span>
+                <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] text-[#4b5563]">PHP</span>
+                <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] text-[#4b5563]">MySQL</span>
                 {{-- Named by the reference stack, not installed here. The wiring
                          table below says so rather than leaving this badge to
                          imply otherwise. --}}
-                <span class="rounded-full bg-[#f3f4f6] px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.04em] text-[#4b5563]">Brevo</span>
+                <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.04em] text-[#4b5563]">Brevo</span>
             </div>
         </div>
 
         <div class="rounded-xl border border-ordo-line bg-white p-4">
-            <span class="text-[10px] uppercase tracking-[0.04em] text-ordo-faint">Integration Mode</span>
-            <strong class="mt-1 block text-[12px] text-ordo-ink">Additive shared module</strong>
-            <p class="mb-0 mt-1.5 text-[10px] leading-[1.55] text-ordo-muted">
+            <span class="text-xs uppercase tracking-[0.04em] text-ordo-faint">Integration Mode</span>
+            <strong class="mt-1 block text-sm font-semibold text-ordo-ink">Additive shared module</strong>
+            <p class="mb-0 mt-1.5 text-xs leading-[1.55] text-ordo-muted">
                 Do not rebuild current ORDO modules. Connect them progressively to the central
                 Records engine.
             </p>
         </div>
 
         <div class="rounded-xl border border-ordo-line bg-white p-4">
-            <span class="text-[10px] uppercase tracking-[0.04em] text-ordo-faint">Core Pattern</span>
-            <strong class="mt-1 block text-[12px] text-ordo-ink">RecordService + Recordable + polymorphic record_links</strong>
-            <p class="mb-0 mt-1.5 text-[10px] leading-[1.55] text-ordo-muted">
+            <span class="text-xs uppercase tracking-[0.04em] text-ordo-faint">Core Pattern</span>
+            <strong class="mt-1 block text-sm font-semibold text-ordo-ink">RecordService + Recordable + polymorphic record_links</strong>
+            <p class="mb-0 mt-1.5 text-xs leading-[1.55] text-ordo-muted">
                 The same Record can be reused anywhere without duplicating its master file.
             </p>
         </div>
@@ -54,17 +54,17 @@
     {{-- ============ PLANNED MAPPING ============ --}}
     <div class="rounded-xl border border-ordo-line bg-white p-4">
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <h4 class="m-0 text-[12px] font-bold text-ordo-ink">Generated Document Mapping</h4>
-            <span class="text-[10px] text-ordo-muted">Module &rarr; Records</span>
+            <h4 class="m-0 text-sm font-bold text-ordo-ink">Generated Document Mapping</h4>
+            <span class="text-xs text-ordo-muted">Module &rarr; Records</span>
         </div>
 
-        <p class="mb-3 mt-1.5 text-[10px] leading-[1.55] text-ordo-muted">
+        <p class="mb-3 mt-1.5 text-xs leading-[1.55] text-ordo-muted">
             When a module-generated document reaches the configured final state, the module can
             register it directly as an official Record. Drafts remain working objects.
         </p>
 
         <div class="overflow-x-auto rounded-lg border border-ordo-line">
-            <table class="w-full border-collapse text-[11px]">
+            <table class="w-full border-collapse text-xs">
                 <thead>
                     <tr class="border-b border-ordo-line bg-[#fbfcfe] text-left">
                         <th class="px-3 py-2 font-semibold text-ordo-muted">Module</th>
@@ -88,13 +88,13 @@
                             <td class="px-3 py-2">
                                 <span class="font-mono text-ordo-muted">{{ $mapping['classification'] }}</span>
                                 @if ($mapping['classificationName'])
-                                    <small class="mt-0.5 block text-[9px] text-ordo-faint">{{ $mapping['classificationName'] }}</small>
+                                    <small class="mt-0.5 block text-[10px] text-ordo-faint">{{ $mapping['classificationName'] }}</small>
                                 @endif
                             </td>
                             <td class="px-3 py-2">
                                 <span class="font-mono text-ordo-muted">{{ $mapping['index'] }}</span>
                                 @if ($mapping['indexName'])
-                                    <small class="mt-0.5 block text-[9px] text-ordo-faint">{{ $mapping['indexName'] }}</small>
+                                    <small class="mt-0.5 block text-[10px] text-ordo-faint">{{ $mapping['indexName'] }}</small>
                                 @endif
                             </td>
                             <td class="px-3 py-2">
@@ -107,7 +107,7 @@
         </div>
 
         <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <p class="m-0 text-[10px] leading-[1.55] text-ordo-muted">
+            <p class="m-0 text-xs leading-[1.55] text-ordo-muted">
                 Every mapping above is <b>planned</b>. None is connected to a live module yet &mdash;
                 Corporate Governance is delivered after this foundation is accepted.
             </p>

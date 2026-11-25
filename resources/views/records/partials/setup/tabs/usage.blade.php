@@ -31,13 +31,13 @@
         {{-- ============ RECORD CAPACITY ============ --}}
         <div class="rounded-xl border border-ordo-line bg-white p-4">
             <div class="flex items-start justify-between gap-3">
-                <h4 class="m-0 text-[12px] font-bold text-ordo-ink">Record Capacity</h4>
-                <span class="text-[10px] text-ordo-muted">Official records</span>
+                <h4 class="m-0 text-sm font-bold text-ordo-ink">Record Capacity</h4>
+                <span class="text-xs text-ordo-muted">Official records</span>
             </div>
 
             <div class="mt-3 flex items-baseline justify-between gap-3">
-                <span class="text-[11px] text-ordo-muted">Used</span>
-                <strong class="text-[12px] text-ordo-ink">
+                <span class="text-xs text-ordo-muted">Used</span>
+                <strong class="text-sm font-semibold text-ordo-ink">
                     {{ number_format($recordUnitsUsed) }}
                     @if ($recordLimit !== null)
                         / {{ number_format($recordLimit) }}
@@ -57,7 +57,7 @@
                 </div>
             @endif
 
-            <p class="mb-0 mt-2.5 text-[10px] leading-[1.55] text-ordo-muted">
+            <p class="mb-0 mt-2.5 text-xs leading-[1.55] text-ordo-muted">
                 @if ($recordLimit === null)
                     No Record Unit allowance has been set for this company.
                 @endif
@@ -69,13 +69,13 @@
         {{-- ============ STORAGE ============ --}}
         <div class="rounded-xl border border-ordo-line bg-white p-4">
             <div class="flex items-start justify-between gap-3">
-                <h4 class="m-0 text-[12px] font-bold text-ordo-ink">Storage</h4>
-                <span class="text-[10px] text-ordo-muted">All retained file bytes</span>
+                <h4 class="m-0 text-sm font-bold text-ordo-ink">Storage</h4>
+                <span class="text-xs text-ordo-muted">All retained file bytes</span>
             </div>
 
             <div class="mt-3 flex items-baseline justify-between gap-3">
-                <span class="text-[11px] text-ordo-muted">Used</span>
-                <strong class="text-[12px] text-ordo-ink">
+                <span class="text-xs text-ordo-muted">Used</span>
+                <strong class="text-sm font-semibold text-ordo-ink">
                     @fileSize($storageBytesUsed)
                     @if ($storageLimitBytes !== null)
                         / @fileSize($storageLimitBytes)
@@ -90,7 +90,7 @@
                 </div>
             @endif
 
-            <p class="mb-0 mt-2.5 text-[10px] leading-[1.55] text-ordo-muted">
+            <p class="mb-0 mt-2.5 text-xs leading-[1.55] text-ordo-muted">
                 Master files, supporting attachments, prior versions and unclassified uploads all
                 consume storage. Links never duplicate storage.
             </p>

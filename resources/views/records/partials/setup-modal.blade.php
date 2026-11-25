@@ -41,7 +41,7 @@
                 <div class="mb-4 flex flex-wrap gap-1 border-b border-ordo-line max-[720px]:overflow-x-auto max-[720px]:flex-nowrap">
                     <template x-for="entry in tabs" x-bind:key="entry.key">
                         <button type="button"
-                                class="border-0 border-b-2 border-transparent bg-transparent px-2.5 py-2 text-[11px] transition-colors"
+                                class="border-0 border-b-2 border-transparent bg-transparent px-3.5 py-2.5 text-sm font-semibold transition-colors"
                                 x-bind:class="tab === entry.key ? 'border-ordo-blue text-ordo-blue' : 'text-[#6b7280] hover:text-ordo-ink'"
                                 x-on:click="select(entry.key)"
                                 x-text="entry.label"></button>

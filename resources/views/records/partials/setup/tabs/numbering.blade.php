@@ -19,25 +19,25 @@
         <x-ordo.field label="Record Prefix">
             <input type="text" name="record_prefix" id="numPrefix" maxlength="10" required
                    value="{{ $numbering['prefix'] }}"
-                   class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                   class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue" />
         </x-ordo.field>
 
         <x-ordo.field label="Sequence Digits">
             <input type="number" name="record_sequence_digits" id="numPad" min="3" max="10" required
                    value="{{ $numbering['digits'] }}"
-                   class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                   class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue" />
         </x-ordo.field>
 
         <x-ordo.field label="Next Sequence"
                       help="The number the next filed record will receive.">
             <input type="number" name="record_next_sequence" id="numNext" min="1" required
                    value="{{ $numbering['next'] }}"
-                   class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue" />
+                   class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue" />
         </x-ordo.field>
 
         <x-ordo.field label="Include Year">
             <select name="record_include_year" id="numYear" required
-                    class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-[12px] outline-none focus:border-ordo-blue">
+                    class="w-full rounded-lg border border-ordo-line bg-white px-2.5 py-2 text-sm outline-none focus:border-ordo-blue">
                 <option value="yes" @selected($numbering['includeYear'])>Yes</option>
                 <option value="no" @selected(! $numbering['includeYear'])>No</option>
             </select>
