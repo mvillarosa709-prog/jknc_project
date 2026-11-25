@@ -30,9 +30,9 @@
      x-init="if (initialItemId) show(initialItemId)"
      x-show="open" x-cloak
      x-on:ordo:classify-open.window="show($event.detail?.id)"
-     x-on:keydown.escape.window="if (open) close()"
-     x-on:keydown.ctrl.s.window.prevent="if (open) { pane = 'ocr'; $nextTick(() => $refs.ocrSearchInput?.focus()); }"
-     x-on:keydown.ctrl.f.window.prevent="if (open) { pane = 'ocr'; $nextTick(() => $refs.ocrSearchInput?.focus()); }"
+     x-on:keydown.escape.window="if (showOcrSearch) { closeOcrSearch(); } else if (open) { close(); }"
+     x-on:keydown.ctrl.s.window.prevent="if (open) { pane = 'ocr'; openOcrSearch(); }"
+     x-on:keydown.ctrl.f.window.prevent="if (open) { pane = 'ocr'; openOcrSearch(); }"
      x-on:click.self="close()">
 
     <div class="absolute inset-2.5 overflow-hidden rounded-[14px] bg-white shadow-[0_24px_70px_rgba(15,23,42,.22)]"
@@ -134,28 +134,27 @@
                             {{-- Read-only, for the same reason as the record drawer:
                                  extracted text is the record of what the document
                                  said and is not something to edit in place. --}}
-                            <div class="flex h-full min-h-[500px] flex-col overflow-hidden p-3.5" x-show="pane === 'ocr'" x-cloak>
+                            <div class="flex h-full min-h-[520px] flex-col overflow-hidden p-3.5" x-show="pane === 'ocr'" x-cloak>
                                 <template x-if="master && master.ocrText">
-                                    <div class="flex h-full min-h-0 flex-col">
-                                        <div class="mb-3 flex items-center gap-2 border-b border-ordo-line pb-2.5">
+                                    <div class="flex h-full min-h-[480px] flex-col">
+                                        <div class="mb-3 flex items-center gap-2 border-b border-ordo-line pb-2.5" x-show="showOcrSearch" x-cloak>
                                             <div class="relative flex-1">
                                                 <span class="absolute left-2.5 top-2 text-[12px] text-ordo-muted">⌕</span>
                                                 <input type="search" x-model="ocrSearchQuery" x-ref="ocrSearchInput"
-                                                       placeholder="Search text in document (Ctrl+F or Ctrl+S)..."
+                                                       placeholder="Search text in document..."
                                                        class="w-full rounded-lg border border-ordo-line bg-white py-1.5 pl-8 pr-3 text-[11px] outline-none focus:border-ordo-blue" />
                                             </div>
                                             <template x-if="ocrSearchQuery && ocrSearchQuery.trim()">
                                                 <span class="shrink-0 text-[10px] text-ordo-muted"
                                                       x-text="ocrMatchCount + (ocrMatchCount === 1 ? ' match' : ' matches')"></span>
                                             </template>
-                                            <template x-if="ocrSearchQuery">
-                                                <button type="button" x-on:click="ocrSearchQuery = ''"
-                                                        class="px-1.5 py-1 text-[10px] text-ordo-muted hover:text-ordo-ink">Clear</button>
-                                            </template>
+                                            <button type="button" x-on:click="closeOcrSearch()"
+                                                    class="px-1.5 py-1 text-[13px] leading-none text-ordo-muted hover:text-ordo-ink"
+                                                    title="Close search (Esc)">&times;</button>
                                         </div>
-                                        <div class="min-h-0 flex-1 overflow-auto">
-                                            <pre class="whitespace-pre-wrap font-mono text-[11px] leading-[1.55] text-ordo-ink"
-                                                 x-html="highlightedOcrText"></pre>
+                                        <div class="min-h-[480px] flex-1 overflow-auto rounded-lg border border-gray-200 bg-[#f8fafc] p-4">
+                                            <pre class="whitespace-pre-wrap font-mono text-[12px] leading-[1.6] text-gray-800"
+                                                 x-html="highlightedOcrText || escapeHtml(master?.ocrText || '')"></pre>
                                         </div>
                                     </div>
                                 </template>

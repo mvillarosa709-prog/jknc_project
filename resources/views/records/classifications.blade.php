@@ -23,7 +23,6 @@
                     <button type="button"
                             x-on:click="open('classification')"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-[#2563eb] px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#1d4ed8] transition-colors">
-                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                         + Add Classification
                     </button>
                 @endif

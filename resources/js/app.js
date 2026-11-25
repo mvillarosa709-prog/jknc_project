@@ -552,6 +552,20 @@ function documentReading() {
         reReadMessage: '',
         reReadPoll: null,
         ocrSearchQuery: '',
+        showOcrSearch: false,
+
+        openOcrSearch() {
+            this.showOcrSearch = true;
+            this.$nextTick(() => {
+                const input = this.$refs.recordOcrSearchInput || this.$refs.ocrSearchInput;
+                input?.focus();
+            });
+        },
+
+        closeOcrSearch() {
+            this.showOcrSearch = false;
+            this.ocrSearchQuery = '';
+        },
 
         escapeHtml(text) {
             return String(text ?? '')
@@ -823,6 +837,7 @@ function documentReading() {
             this.reReadStatus = '';
             this.reReadMessage = '';
             this.ocrSearchQuery = '';
+            this.showOcrSearch = false;
         },
     };
 }
